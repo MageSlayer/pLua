@@ -1,0 +1,155 @@
+This file is here to give a listing of all variables, properties, and methods that are surfaced to the scripting engine.  These are only the ones that are above and beyond the standard Lua libraries.
+
+This file contains sections for Global Variables, Exported Properties (of nodes), Exported Methods, and the Class Heriarchary.
+
+Global Variables:
+  SourceFile
+    Source filename (including path and extension) of the file that the generator is working with.  This should be used to derrive the output filename.
+
+Exported Properties:
+  SourceFilename
+    Source filename that the node resides in.
+  SourceLinenumber
+    Source linenumber that the node was found on.
+  FullName
+    Full name of the node.
+  PathName
+    Path name of the node within the tree.
+  ElementTypeName
+    The textual name of the type of the node.
+  Name
+    The name of the node.  In some cases (such as Function Types and Procedure Types) this will be blank.
+  Parent
+    Pointer to the parent of the node.  May be NIL if the node is a top level node.
+  ClassName
+    Pascal class name associated with the node type.
+  Visibility
+    Visibility of the node in string format of "default", "private", "protected", "public", "published", or "automated".
+  DestType
+    Pointer to the node defining the current node type.  Only valid on TPasPointerType and TPasAliasType nodes.
+  PackageName
+    Name of the package the node represents.  Only valid on TPasModule node types.
+  Value
+    The default value assigned to the current node.  Only valid on TPasResString, TPasEnumValue, TPasArgument, and TPasVariable node types.
+  RangeStart
+    The start or low bound of the range the node represents.  Only valid on TPasRangeType nodes.
+  RangeEnd
+    The end or high bound of the range the node represents.  Only valid on TPasRangeType nodes.
+  IndexRange
+    The textual version of the IndexRange for an array node type.  Only valid on TPasArrayType nodes.
+  IsPacked
+    Boolean value if the node is a packed type or not.  Only valid on TPasArrayType, TPasRecordType, and TPasClassType nodes.
+  ElType
+    Element type of the current node. Only valid on TPasArrayType and TPasFileType nodes.  In "procedure of object;" the ElType would be "object".
+  IsValueUsed 
+    Boolean value stating if the enumeration value of the node is apparently used in the source code.  Only valid on TPasEnumValue nodes.
+  AssignedValue
+    Value assigned to an Enum type node by default.  Only valid on TPasEnumValue nodes.
+  EnumType
+    Type node assigned to the enum node.  Only valid on TPasEnumValue nodes.
+  VariantName
+    Name of the variant part of a record node.  Only valid on TPasRecordType nodes.
+  VariantType
+    Type of the variant part of a record node.  Only valid on TPasRecordType nodes.
+  Members
+    Node holding the members of a variant node type.  Only valid on TPasVariant nodes.
+  ObjKind
+    String of "Object", "Class", or "Interface" describing the type of the node type.  Only valid on TPasClassType nodes.
+  AncestorType
+    Ancestor node type for the current type node.  Only valid on TPasClassType nodes.
+  InterfaceGUID
+    String of the GUID assigned to a class type node.  Only valid on TPasClassType nodes.
+  Access
+    Access type of an argument.  String of "Default", "Const", "Var", or "Out".  Only valid on TPasArgument nodes.
+  ArgType
+    Type node for the argument node.  Only valid on TPasArgument nodes.
+  IsOfObject
+    Boolean representing if the method is an "of object" method.  Only valid on TPasProcedureType and TPasFunctionType nodes.
+  ResultType
+    Type node for the result type node.  Only valid on TPasResultElement nodes.
+  ResultEl
+    Type node for a function result element node.  Only valid on TPasFunctionType nodes.
+  RefType
+    Type node for a reference node.  Only valid on TPasTypeRef nodes.
+  VarType
+    Type node for a variable node.  Only valid on TPasVariable nodes.
+  Modifiers
+    Modifiers associated with a variable node.  Only valid on TPasVariable nodes.
+  AbsoluteLocation
+    If a variable is an absolute variable this string contains its absolute location.  Only valid on TPasVariable nodes.
+  IndexValue
+    Index value for a property node.  Only valid on TPasProperty nodes.
+  ReadAccessorName
+    String name of the reader method for a property node.  Only valid on TPasProperty nodes.
+  WriteAccessorName
+    String name of the writer method for a property node.  Only valid on TPasProperty nodes.
+  StoredAccessorName
+    String name of the stored method for a property node.  Only valid on TPasProperty nodes.
+  DefaultValue
+    String value of the default value for a property node.  Only valid on TPasProperty nodes.
+  IsDefault
+    Boolean value stating if an indexed node is the default for a class.  Only valid on TPasProperty nodes.
+  IsNodefault
+    Boolean value stating if an indexed node is NOT the default for a class.  Only valid on TPasProperty nodes.
+  TypeName
+    Type name associated with a procedure base node.  Only valid on TPasProcedureBase type nodes.
+  ProcType
+    Type node of a method pointer (event) node.  Only valid on TPasProcedure type nodes.
+  IsVirtual
+    Boolean value of a method node stating if it is defined as virtual.  Only valid on TPasProcedure type nodes.
+  IsDynamic
+    Boolean value of a method node stating if it is defined as dynamic.  Only valid on TPasProcedure type nodes.
+  IsAbstract
+    Boolean value of a method node stating if it is defined as abstract.  Only valid on TPasProcedure type nodes.
+  IsOverride
+    Boolean value of a method node stating if it is defined as override.  Only valid on TPasProcedure type nodes.
+  IsOverload
+    Boolean value of a method node stating if it is defined as overloaded.  Only valid on TPasProcedure type nodes.
+  IsMessage
+    Boolean value of a method node stating if it is defined as a message method.  Only valid on TPasProcedure type nodes.
+  isReintroduced
+    Boolean value of a method node stating if it is defined as reintroduced.  Only valid on TPasProcedure type nodes.
+  isStatic
+    Boolean value of a method node stating if it is defined as static.  Only valid on TPasProcedure type nodes.
+
+Exported Methods:
+  GetDeclaration(Full = True)->String
+    Returns the declaration of the given node (by default returns the full declaration of the node).
+  GetGetEnumNames()->Table with names
+    Returns the names that an enumeration node represents.  Only valid on TPasEnumType nodes.
+
+Class Heriarchary:
+  TPasElement
+    TPasSection
+    TPasModule
+    TPasPackage
+    TPasResString
+    TPasType
+      TPasAliasType
+        TPasTypeAliasType
+        TPasClassOfType
+      TPasRangeType
+      TPasArrayType
+      TPasFileType
+      TPasEnumType
+      TPasSetType
+      TPasRecordType
+      TPasClassType
+      TPasProcedureType
+        TPasFunctionType
+      TPasUnresolvedTypeRef
+        TPasTypeRef
+    TPasEnumValue
+    TPasVariant
+    TPasArgument
+    TPasResultElement
+    TPasVariable
+      TPasConst
+      TPasProperty
+    TPasProcedureBase
+      TPasOverloadedProc
+      TPasProcedure
+      TPasFunction
+      TPasOperator
+      TPasConstructor
+      TPasDestructor

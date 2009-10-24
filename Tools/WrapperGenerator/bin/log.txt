@@ -1,0 +1,57 @@
+Processing Source File "C:\lazarus\projects\Lua\pLua\Tools\WrapperGenerator\bin\Test.pas"
+
+Processing Node Test(TPasModule) with DefaultHandler
+  Processing Node (TPasSection) with DefaultHandler
+    Processing Node TMyRecord(TPasRecordType) with DefaultHandler
+      Processing Node v1(TPasVariable) with DefaultHandler
+      Completed Node v1(TPasVariable) with DefaultHandler
+      Processing Node v2(TPasVariable) with DefaultHandler
+      Completed Node v2(TPasVariable) with DefaultHandler
+    Completed Node TMyRecord(TPasRecordType) with DefaultHandler
+    Processing Node TMyObject(TPasClassType) with DefaultHandler
+      Processing Node Test(TPasProcedure) with DefaultHandler
+        Processing Node (TPasProcedureType) with DefaultHandler
+        Completed Node (TPasProcedureType) with DefaultHandler
+      Completed Node Test(TPasProcedure) with DefaultHandler
+      Processing Node DoIt(TPasFunction) with DefaultHandler
+        Processing Node (TPasFunctionType) with DefaultHandler
+        Completed Node (TPasFunctionType) with DefaultHandler
+        Processing Node Result(TPasResultElement) with DefaultHandler
+        Completed Node Result(TPasResultElement) with DefaultHandler
+        Processing Node Val1(TPasArgument) with DefaultHandler
+        Completed Node Val1(TPasArgument) with DefaultHandler
+        Processing Node Val2(TPasArgument) with DefaultHandler
+        Completed Node Val2(TPasArgument) with DefaultHandler
+      Completed Node DoIt(TPasFunction) with DefaultHandler
+    Completed Node TMyObject(TPasClassType) with DefaultHandler
+    Processing Node TMyObjectSub(TPasClassType) with DefaultHandler
+      Processing Node SomeProp(TPasProperty) with DefaultHandler
+      Completed Node SomeProp(TPasProperty) with DefaultHandler
+    Completed Node TMyObjectSub(TPasClassType) with DefaultHandler
+    Processing Node Test2(TPasFunction) with DefaultHandler
+      Processing Node (TPasFunctionType) with DefaultHandler
+      Completed Node (TPasFunctionType) with DefaultHandler
+      Processing Node Result(TPasResultElement) with DefaultHandler
+      Completed Node Result(TPasResultElement) with DefaultHandler
+      Processing Node Val1(TPasArgument) with DefaultHandler
+      Completed Node Val1(TPasArgument) with DefaultHandler
+      Processing Node Val2(TPasArgument) with DefaultHandler
+      Completed Node Val2(TPasArgument) with DefaultHandler
+    Completed Node Test2(TPasFunction) with DefaultHandler
+    Processing Node ProcTest(TPasProcedure) with DefaultHandler
+      Processing Node (TPasProcedureType) with DefaultHandler
+      Completed Node (TPasProcedureType) with DefaultHandler
+    Completed Node ProcTest(TPasProcedure) with DefaultHandler
+    Processing Node v1(TPasVariable) with DefaultHandler
+    Completed Node v1(TPasVariable) with DefaultHandler
+    Processing Node v2(TPasVariable) with DefaultHandler
+    Completed Node v2(TPasVariable) with DefaultHandler
+    Processing Node v3(TPasVariable) with DefaultHandler
+    Completed Node v3(TPasVariable) with DefaultHandler
+    Processing Node c1(TPasConst) with DefaultHandler
+    Completed Node c1(TPasConst) with DefaultHandler
+    Processing Node c2(TPasConst) with DefaultHandler
+    Completed Node c2(TPasConst) with DefaultHandler
+  Completed Node (TPasSection) with DefaultHandler
+Completed Node Test(TPasModule) with DefaultHandler
+Generating output file: C:\lazarus\projects\Lua\pLua\Tools\WrapperGenerator\bin\plua_Test.pas

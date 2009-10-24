@@ -1,0 +1,64 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<title>plua_tovariant</title>
+<link rel="stylesheet" href="../fpdoc.css" type="text/css">
+</head>
+<body>
+<table class="bar" width="100%" border="0" cellpadding="4" cellspacing="0">
+<tr>
+<td><b>[<a href="../plua/index.html">Overview</a>][<a href="../plua/index-3.html">Types</a>][<a href="../plua/index-4.html">Classes</a>][<a href="../plua/index-5.html">Procedures and functions</a>]</b></td>
+<td align="right"><span class="bartitle">Reference for unit 'pLua' (<a href="../index.html">#pLua</a>)</span></td>
+</tr>
+</table>
+<h1>plua_tovariant</h1>
+<p></p>
+<h2>Declaration</h2>
+<p>Source position: plua.pas line 38</p>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td><p><tt><span class="code"><span class="kw">function</span> plua_tovariant<span class="sym">(</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;L<span class="sym">: </span><a href="../lua/plua_state.html">Plua_State</a><span class="sym">;</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;Index<span class="sym">: </span>Integer</span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code"><span class="sym">):</span>Variant<span class="sym">;</span></span></tt></p></td>
+</tr>
+</table>
+<h2>Arguments</h2>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td valign="top"><p><tt><span class="code">L</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">PLua_State to work with.           </p></td>
+</tr>
+<tr>
+<td valign="top"><p><tt><span class="code">Index</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Stack index to work with.           </p></td>
+</tr>
+</table>
+<h2>Function result</h2>
+<p>Value of the item on the stack.           </p>
+<h2>Description</h2>
+<p>Converts the Lua Stack Item at the given index to a Pascal Variant for use in code.  Slower then direct calls to lua_to and plua_to, but more flexable.           </p>
+<h2>See also</h2>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td valign="top"><p><a href="../plua/plua_pushvariant.html">plua_pushVariant</a></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt"></p></td>
+</tr>
+<tr>
+<td valign="top"><p><a href="../plua/plua_tabletovariantarray.html">plua_TableToVariantArray</a></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt"></p></td>
+</tr>
+</table>
+</body>
+</html>

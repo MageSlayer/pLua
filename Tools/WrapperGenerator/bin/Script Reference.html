@@ -1,0 +1,227 @@
+<html>
+<body>
+<p>This file is here to give a listing of all variables,
+properties, and methods that are surfaced to the scripting engine.  These are
+only the ones that are above and beyond the standard Lua libraries.</p>
+
+<p>This file contains sections for Global Variables, Exported
+Properties (of nodes), Exported Methods, and the Class Heriarchary.</p>
+
+<p><b>Global Variables:</b></p>
+<p><b>  SourceFile</b></p>
+<p style='margin-left:36.0pt'>Source filename (including
+path and extension) of the file that the generator is working with.  This
+should be used to derrive the output filename.</p>
+
+<p><b>Exported Properties:</b></p>
+<p><b>  SourceFilename</b></p>
+<p style='margin-left:36.0pt'>Source filename that the node
+resides in.</p>
+<p><b>  SourceLinenumber</b></p>
+<p style='margin-left:36.0pt'>Source linenumber that the
+node was found on.</p>
+<p><b>  FullName</b></p>
+<p style='margin-left:36.0pt'>Full name of the node.</p>
+<p><b>  PathName</b></p>
+<p style='margin-left:36.0pt'>Path name of the node within
+the tree.</p>
+<p><b>  ElementTypeName</b></p>
+<p style='margin-left:36.0pt'>The textual name of the type
+of the node.</p>
+<p><b>  Name</b></p>
+<p style='margin-left:36.0pt'>The name of the node.  In some
+cases (such as Function Types and Procedure Types) this will be blank.</p>
+<p><b>  Parent</b></p>
+<p style='margin-left:36.0pt'>Pointer to the parent of the
+node.  May be NIL if the node is a top level node.</p>
+<p><b>  ClassName</b></p>
+<p style='margin-left:36.0pt'>Pascal class name associated
+with the node type.</p>
+<p><b>  Visibility</b></p>
+<p style='margin-left:36.0pt'>Visibility of the node in string format of &quot;default&quot;, &quot;private&quot;, &quot;protected&quot;, &quot;public&quot;, &quot;published&quot;, or &quot;automated&quot;.</p>
+<p><b>  DestType</b></p>
+<p style='margin-left:36.0pt'>Pointer to the node defining
+the current node type.  Only valid on TPasPointerType and TPasAliasType nodes.</p>
+<p><b>  PackageName</b></p>
+<p style='margin-left:36.0pt'>Name of the package the node
+represents.  Only valid on TPasModule node types.</p>
+<p><b>  Value</b></p>
+<p style='margin-left:36.0pt'>The default value assigned to
+the current node.  Only valid on TPasResString, TPasEnumValue, TPasArgument,
+and TPasVariable node types.</p>
+<p><b>  RangeStart</b></p>
+<p style='margin-left:36.0pt'>The start or low bound of the
+range the node represents.  Only valid on TPasRangeType nodes.</p>
+<p><b>  RangeEnd</b></p>
+<p style='margin-left:36.0pt'>The end or high bound of the
+range the node represents.  Only valid on TPasRangeType nodes.</p>
+<p><b>  IndexRange</b></p>
+<p style='margin-left:36.0pt'>The textual version of the
+IndexRange for an array node type.  Only valid on TPasArrayType nodes.</p>
+<p><b>  IsPacked</b></p>
+<p style='margin-left:36.0pt'>Boolean value if the node is a
+packed type or not.  Only valid on TPasArrayType, TPasRecordType, and
+TPasClassType nodes.</p>
+<p><b>  ElType</b></p>
+<p style='margin-left:36.0pt'>Element type of the current
+node. Only valid on TPasArrayType and TPasFileType nodes.  In &quot;procedure
+of object;&quot; the ElType would be &quot;object&quot;.</p>
+<p><b>  IsValueUsed </b></p>
+<p style='margin-left:36.0pt'>Boolean value stating if the
+enumeration value of the node is apparently used in the source code.  Only
+valid on TPasEnumValue nodes.</p>
+<p><b>  AssignedValue</b></p>
+<p style='margin-left:36.0pt'>Value assigned to an Enum type
+node by default.  Only valid on TPasEnumValue nodes.</p>
+<p><b>  EnumType</b></p>
+<p style='margin-left:36.0pt'>Type node assigned to the enum
+node.  Only valid on TPasEnumValue nodes.</p>
+<p><b>  VariantName</b></p>
+<p style='margin-left:36.0pt'>Name of the variant part of a
+record node.  Only valid on TPasRecordType nodes.</p>
+<p><b>  VariantType</b></p>
+<p style='margin-left:36.0pt'>Type of the variant part of a
+record node.  Only valid on TPasRecordType nodes.</p>
+<p><b>  Members</b></p>
+<p style='margin-left:36.0pt'>Node holding the members of a
+variant node type.  Only valid on TPasVariant nodes.</p>
+<p><b>  ObjKind</b></p>
+<p style='margin-left:36.0pt'>String of &quot;Object&quot;,
+&quot;Class&quot;, or &quot;Interface&quot; describing the type of the node
+type.  Only valid on TPasClassType nodes.</p>
+<p><b>  AncestorType</b></p>
+<p style='margin-left:36.0pt'>Ancestor node type for the
+current type node.  Only valid on TPasClassType nodes.</p>
+<p><b>  InterfaceGUID</b></p>
+<p style='margin-left:36.0pt'>String of the GUID assigned to
+a class type node.  Only valid on TPasClassType nodes.</p>
+<p><b>  Access</b></p>
+<p style='margin-left:36.0pt'>Access type of an argument. 
+String of &quot;Default&quot;, &quot;Const&quot;, &quot;Var&quot;, or
+&quot;Out&quot;.  Only valid on TPasArgument nodes.</p>
+<p><b>  ArgType</b></p>
+<p style='margin-left:36.0pt'>Type node for the argument
+node.  Only valid on TPasArgument nodes.</p>
+<p><b>  IsOfObject</b></p>
+<p style='margin-left:36.0pt'>Boolean representing if the
+method is an &quot;of object&quot; method.  Only valid on TPasProcedureType and
+TPasFunctionType nodes.</p>
+<p><b>  ResultType</b></p>
+<p style='margin-left:36.0pt'>Type node for the result type
+node.  Only valid on TPasResultElement nodes.</p>
+<p><b>  ResultEl</b></p>
+<p style='margin-left:36.0pt'>Type node for a function
+result element node.  Only valid on TPasFunctionType nodes.</p>
+<p><b>  RefType</b></p>
+<p style='margin-left:36.0pt'>Type node for a reference
+node.  Only valid on TPasTypeRef nodes.</p>
+<p><b>  VarType</b></p>
+<p style='margin-left:36.0pt'>Type node for a variable
+node.  Only valid on TPasVariable nodes.</p>
+<p><b>  Modifiers</b></p>
+<p style='margin-left:36.0pt'>Modifiers associated with a
+variable node.  Only valid on TPasVariable nodes.</p>
+<p><b>  AbsoluteLocation</b></p>
+<p style='margin-left:36.0pt'>If a variable is an absolute
+variable this string contains its absolute location.  Only valid on
+TPasVariable nodes.</p>
+<p><b>  IndexValue</b></p>
+<p style='margin-left:36.0pt'>Index value for a property
+node.  Only valid on TPasProperty nodes.</p>
+<p><b>  ReadAccessorName</b></p>
+<p style='margin-left:36.0pt'>String name of the reader
+method for a property node.  Only valid on TPasProperty nodes.</p>
+<p><b>  WriteAccessorName</b></p>
+<p style='margin-left:36.0pt'>String name of the writer
+method for a property node.  Only valid on TPasProperty nodes.</p>
+<p><b>  StoredAccessorName</b></p>
+<p style='margin-left:36.0pt'>String name of the stored
+method for a property node.  Only valid on TPasProperty nodes.</p>
+<p><b>  DefaultValue</b></p>
+<p style='margin-left:36.0pt'>String value of the default
+value for a property node.  Only valid on TPasProperty nodes.</p>
+<p><b>  IsDefault</b></p>
+<p style='margin-left:36.0pt'>Boolean value stating if an
+indexed node is the default for a class.  Only valid on TPasProperty nodes.</p>
+<p><b>  IsNodefault</b></p>
+<p style='margin-left:36.0pt'>Boolean value stating if an
+indexed node is NOT the default for a class.  Only valid on TPasProperty nodes.</p>
+<p><b>  TypeName</b></p>
+<p style='margin-left:36.0pt'>Type name associated with a
+procedure base node.  Only valid on TPasProcedureBase type nodes.</p>
+<p><b>  ProcType</b></p>
+<p style='margin-left:36.0pt'>Type node of a method pointer
+(event) node.  Only valid on TPasProcedure type nodes.</p>
+<p><b>  IsVirtual</b></p>
+<p style='margin-left:36.0pt'>Boolean value of a method node
+stating if it is defined as virtual.  Only valid on TPasProcedure type nodes.</p>
+<p><b>  IsDynamic</b></p>
+<p style='margin-left:36.0pt'>Boolean value of a method node
+stating if it is defined as dynamic.  Only valid on TPasProcedure type nodes.</p>
+<p><b>  IsAbstract</b></p>
+<p style='margin-left:36.0pt'>Boolean value of a method node
+stating if it is defined as abstract.  Only valid on TPasProcedure type nodes.</p>
+<p><b>  IsOverride</b></p>
+<p style='margin-left:36.0pt'>Boolean value of a method node
+stating if it is defined as override.  Only valid on TPasProcedure type nodes.</p>
+<p><b>  IsOverload</b></p>
+<p style='margin-left:36.0pt'>Boolean value of a method node
+stating if it is defined as overloaded.  Only valid on TPasProcedure type
+nodes.</p>
+<p><b>  IsMessage</b></p>
+<p style='margin-left:36.0pt'>Boolean value of a method node
+stating if it is defined as a message method.  Only valid on TPasProcedure type
+nodes.</p>
+<p><b>  isReintroduced</b></p>
+<p style='margin-left:36.0pt'>Boolean value of a method node
+stating if it is defined as reintroduced.  Only valid on TPasProcedure type
+nodes.</p>
+<p><b>  isStatic</b></p>
+<p style='margin-left:36.0pt'>Boolean value of a method node
+stating if it is defined as static.  Only valid on TPasProcedure type nodes.</p>
+
+<p><b>Exported Methods:</b></p>
+<p><b>  GetDeclaration(Full = True)-&gt;String</b></p>
+<p style='margin-left:36.0pt'>Returns the declaration of the
+given node (by default returns the full declaration of the node).</p>
+<p><b>  GetGetEnumNames()-&gt;Table with names</b></p>
+<p style='margin-left:36.0pt'>Returns the names that an
+enumeration node represents.  Only valid on TPasEnumType nodes.</p>
+
+<p><b>Class Heriarchary:</b></p><pre>
+  TPasElement
+    TPasSection
+    TPasModule
+    TPasPackage
+    TPasResString
+    TPasType
+      TPasAliasType
+        TPasTypeAliasType
+        TPasClassOfType
+      TPasRangeType
+      TPasArrayType
+      TPasFileType
+      TPasEnumType
+      TPasSetType
+      TPasRecordType
+      TPasClassType
+      TPasProcedureType
+        TPasFunctionType
+      TPasUnresolvedTypeRef
+        TPasTypeRef
+    TPasEnumValue
+    TPasVariant
+    TPasArgument
+    TPasResultElement
+    TPasVariable
+      TPasConst
+      TPasProperty
+    TPasProcedureBase
+      TPasOverloadedProc
+      TPasProcedure
+      TPasFunction
+      TPasOperator
+      TPasConstructor
+      TPasDestructor</pre>
+</body>
+</html>

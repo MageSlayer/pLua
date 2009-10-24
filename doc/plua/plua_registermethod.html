@@ -1,0 +1,65 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<title>plua_RegisterMethod</title>
+<link rel="stylesheet" href="../fpdoc.css" type="text/css">
+</head>
+<body>
+<table class="bar" width="100%" border="0" cellpadding="4" cellspacing="0">
+<tr>
+<td><b>[<a href="../plua/index.html">Overview</a>][<a href="../plua/index-3.html">Types</a>][<a href="../plua/index-4.html">Classes</a>][<a href="../plua/index-5.html">Procedures and functions</a>]</b></td>
+<td align="right"><span class="bartitle">Reference for unit 'pLua' (<a href="../index.html">#pLua</a>)</span></td>
+</tr>
+</table>
+<h1>plua_RegisterMethod</h1>
+<p></p>
+<h2>Declaration</h2>
+<p>Source position: plua.pas line 46</p>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td><p><tt><span class="code"><span class="kw">procedure</span> plua_RegisterMethod<span class="sym">(</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;l<span class="sym">: </span><a href="../lua/plua_state.html">Plua_State</a><span class="sym">;</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;aMethodName<span class="sym">: </span>AnsiString<span class="sym">;</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;MethodPtr<span class="sym">: </span><a href="../lua/lua_cfunction.html">lua_CFunction</a><span class="sym">;</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;totable<span class="sym">: </span>Integer <span class="sym">=</span> LUA_GLOBALSINDEX</span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code"><span class="sym">)</span><span class="sym">;</span></span></tt></p></td>
+</tr>
+</table>
+<h2>Arguments</h2>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td valign="top"><p><tt><span class="code">l</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">PLua_State to work with.           </p></td>
+</tr>
+<tr>
+<td valign="top"><p><tt><span class="code">aMethodName</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Name of the method in the Lua environemnt.           </p></td>
+</tr>
+<tr>
+<td valign="top"><p><tt><span class="code">MethodPtr</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Address of the method to call.           </p></td>
+</tr>
+<tr>
+<td valign="top"><p><tt><span class="code">totable</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Table index to put the method into, if none is specified then LUA_GLOABLSINDEX is used.  Thus, making the method global.           </p></td>
+</tr>
+</table>
+<h2>Description</h2>
+<p>Used to register a Pascal method (that follows the lua_CFunction standard) into the Lua environemnt.           </p>
+</body>
+</html>

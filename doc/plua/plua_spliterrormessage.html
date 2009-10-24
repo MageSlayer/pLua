@@ -1,0 +1,65 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<title>plua_spliterrormessage</title>
+<link rel="stylesheet" href="../fpdoc.css" type="text/css">
+</head>
+<body>
+<table class="bar" width="100%" border="0" cellpadding="4" cellspacing="0">
+<tr>
+<td><b>[<a href="../plua/index.html">Overview</a>][<a href="../plua/index-3.html">Types</a>][<a href="../plua/index-4.html">Classes</a>][<a href="../plua/index-5.html">Procedures and functions</a>]</b></td>
+<td align="right"><span class="bartitle">Reference for unit 'pLua' (<a href="../index.html">#pLua</a>)</span></td>
+</tr>
+</table>
+<h1>plua_spliterrormessage</h1>
+<p></p>
+<h2>Declaration</h2>
+<p>Source position: plua.pas line 42</p>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td><p><tt><span class="code"><span class="kw">procedure</span> plua_spliterrormessage<span class="sym">(</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;<span class="kw">const </span>ErrMsg<span class="sym">: </span>String<span class="sym">;</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;<span class="kw">out </span>Title<span class="sym">: </span>ansistring<span class="sym">;</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;<span class="kw">out </span>Line<span class="sym">: </span>Integer<span class="sym">;</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;<span class="kw">out </span>Msg<span class="sym">: </span>ansistring</span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code"><span class="sym">)</span><span class="sym">;</span></span></tt></p></td>
+</tr>
+</table>
+<h2>Arguments</h2>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td valign="top"><p><tt><span class="code">ErrMsg</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Input parameter, you should pass in the error message as it appears in Lua.           </p></td>
+</tr>
+<tr>
+<td valign="top"><p><tt><span class="code">Title</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Output parameter that contains the title of the error message.           </p></td>
+</tr>
+<tr>
+<td valign="top"><p><tt><span class="code">Line</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Output parameter that contains the line (in Lua) where the error message occured.           </p></td>
+</tr>
+<tr>
+<td valign="top"><p><tt><span class="code">Msg</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Output parameter that contains the error message.           </p></td>
+</tr>
+</table>
+<h2>Description</h2>
+<p>Takes a Lua exception string and breaks it into its appropriate parts.<br><b>NOTE:</b> If you catch a LuaException yourself this method may be of use, if you are using the <a href="../luawrapper/tlua.html">TLua</a> object from LuaWrapper then use the appropriate event handler instead.           </p>
+</body>
+</html>

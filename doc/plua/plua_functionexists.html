@@ -1,0 +1,67 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<title>plua_functionexists</title>
+<link rel="stylesheet" href="../fpdoc.css" type="text/css">
+</head>
+<body>
+<table class="bar" width="100%" border="0" cellpadding="4" cellspacing="0">
+<tr>
+<td><b>[<a href="../plua/index.html">Overview</a>][<a href="../plua/index-3.html">Types</a>][<a href="../plua/index-4.html">Classes</a>][<a href="../plua/index-5.html">Procedures and functions</a>]</b></td>
+<td align="right"><span class="bartitle">Reference for unit 'pLua' (<a href="../index.html">#pLua</a>)</span></td>
+</tr>
+</table>
+<h1>plua_functionexists</h1>
+<p></p>
+<h2>Declaration</h2>
+<p>Source position: plua.pas line 26</p>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td><p><tt><span class="code"><span class="kw">function</span> plua_functionexists<span class="sym">(</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;L<span class="sym">: </span><a href="../lua/plua_state.html">Plua_State</a><span class="sym">;</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;FunctionName<span class="sym">: </span>AnsiString<span class="sym">;</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;TableIndex<span class="sym">: </span>Integer <span class="sym">=</span> LUA_GLOBALSINDEX</span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code"><span class="sym">):</span>Boolean<span class="sym">;</span></span></tt></p></td>
+</tr>
+</table>
+<h2>Arguments</h2>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td valign="top"><p><tt><span class="code">L</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">PLua_State to work with.           </p></td>
+</tr>
+<tr>
+<td valign="top"><p><tt><span class="code">FunctionName</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Name of the function to look for.           </p></td>
+</tr>
+<tr>
+<td valign="top"><p><tt><span class="code">TableIndex</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Table index to look for the function in, if none is specified then LUA_GLOABLSINDEX is used.  Thus, checking for global functions.           </p></td>
+</tr>
+</table>
+<h2>Function result</h2>
+<p>Returns TRUE if the function does exist, and FALSE if it does not.           </p>
+<h2>Description</h2>
+<p>plua_functionexists checks to see if a function exists within the Lua State for the given name.  Returns TRUE if the function does exist, and FALSE if it does not.  A FALSE result does not mean that their isn't a variable of the given name, just that the variable isn't a function.           </p>
+<h2>See also</h2>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td valign="top"><p><a href="../plua/plua_callfunction.html">plua_callfunction</a></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt"></p></td>
+</tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,63 @@
+object frmMain: TfrmMain
+  Left = 291
+  Height = 103
+  Top = 162
+  Width = 314
+  HorzScrollBar.Page = 313
+  VertScrollBar.Page = 102
+  Caption = 'Associative Array Demo'
+  ClientHeight = 103
+  ClientWidth = 314
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  object lblName: TLabel
+    Left = 9
+    Height = 14
+    Top = 8
+    Width = 32
+    Caption = 'Name:'
+    ParentColor = False
+  end
+  object lblValue: TLabel
+    Left = 9
+    Height = 14
+    Top = 48
+    Width = 31
+    Caption = 'Value:'
+    ParentColor = False
+  end
+  object edName: TEdit
+    Left = 15
+    Height = 23
+    Top = 24
+    Width = 217
+    TabOrder = 0
+  end
+  object edValue: TEdit
+    Left = 15
+    Height = 23
+    Top = 64
+    Width = 217
+    TabOrder = 2
+  end
+  object btnRead: TButton
+    Left = 232
+    Height = 25
+    Top = 22
+    Width = 75
+    BorderSpacing.InnerBorder = 4
+    Caption = 'Read'
+    OnClick = btnReadClick
+    TabOrder = 1
+  end
+  object btnWrite: TButton
+    Left = 232
+    Height = 25
+    Top = 62
+    Width = 75
+    BorderSpacing.InnerBorder = 4
+    Caption = 'Write'
+    OnClick = btnWriteClick
+    TabOrder = 3
+  end
+end

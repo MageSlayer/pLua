@@ -1,0 +1,230 @@
+<?xml version="1.0"?>
+<CONFIG>
+  <ProjectOptions>
+    <PathDelim Value="\"/>
+    <Version Value="5"/>
+    <General>
+      <MainUnit Value="0"/>
+      <IconPath Value="./"/>
+      <TargetFileExt Value=".exe"/>
+      <ActiveEditorIndexAtStart Value="0"/>
+    </General>
+    <VersionInfo>
+      <ProjectVersion Value=""/>
+      <Language Value=""/>
+      <CharSet Value=""/>
+    </VersionInfo>
+    <PublishOptions>
+      <Version Value="2"/>
+      <IgnoreBinaries Value="False"/>
+      <IncludeFileFilter Value="*.(pas|pp|inc|lfm|lpr|lrs|lpi|lpk|sh|xml)"/>
+      <ExcludeFileFilter Value="*.(bak|ppu|ppw|o|so);*~;backup"/>
+    </PublishOptions>
+    <RunParams>
+      <local>
+        <FormatVersion Value="1"/>
+        <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
+      </local>
+    </RunParams>
+    <RequiredPackages Count="1">
+      <Item1>
+        <PackageName Value="LCL"/>
+      </Item1>
+    </RequiredPackages>
+    <Units Count="18">
+      <Unit0>
+        <Filename Value="pLuaWrapperGenerator.lpr"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="pLuaWrapperGenerator"/>
+        <CursorPos X="1" Y="17"/>
+        <TopLine Value="1"/>
+        <UsageCount Value="43"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="forms\MainForm.pas"/>
+        <ComponentName Value="frmMain"/>
+        <IsPartOfProject Value="True"/>
+        <ResourceFilename Value="forms\MainForm.lrs"/>
+        <UnitName Value="MainForm"/>
+        <CursorPos X="27" Y="118"/>
+        <TopLine Value="111"/>
+        <EditorIndex Value="0"/>
+        <UsageCount Value="43"/>
+        <Loaded Value="True"/>
+      </Unit1>
+      <Unit2>
+        <Filename Value="lib\parserTree.pas"/>
+        <UnitName Value="parserTree"/>
+        <CursorPos X="1" Y="1"/>
+        <TopLine Value="1"/>
+        <UsageCount Value="16"/>
+      </Unit2>
+      <Unit3>
+        <Filename Value="..\..\..\..\..\fpc\2.1.5\source\packages\fcl-passrc\src\pparser.pp"/>
+        <UnitName Value="PParser"/>
+        <CursorPos X="23" Y="2121"/>
+        <TopLine Value="2105"/>
+        <UsageCount Value="16"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="..\..\..\..\..\fpc\2.1.5\source\packages\fcl-passrc\src\pastree.pp"/>
+        <UnitName Value="PasTree"/>
+        <CursorPos X="43" Y="459"/>
+        <TopLine Value="437"/>
+        <UsageCount Value="20"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="..\..\..\..\..\lcl\forms.pp"/>
+        <UnitName Value="Forms"/>
+        <CursorPos X="20" Y="808"/>
+        <TopLine Value="789"/>
+        <UsageCount Value="13"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="..\..\..\..\..\lcl\controls.pp"/>
+        <UnitName Value="Controls"/>
+        <CursorPos X="3" Y="119"/>
+        <TopLine Value="98"/>
+        <UsageCount Value="13"/>
+      </Unit6>
+      <Unit7>
+        <Filename Value="lib\luaParserNode.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="luaParserNode"/>
+        <CursorPos X="1" Y="4"/>
+        <TopLine Value="1"/>
+        <UsageCount Value="39"/>
+        <Bookmarks Count="1">
+          <Item0 X="38" Y="564" ID="1"/>
+        </Bookmarks>
+      </Unit7>
+      <Unit8>
+        <Filename Value="..\..\pLuaObject.pas"/>
+        <UnitName Value="pLuaObject"/>
+        <CursorPos X="1" Y="1"/>
+        <TopLine Value="1"/>
+        <UsageCount Value="18"/>
+        <Bookmarks Count="1">
+          <Item0 X="3" Y="529" ID="2"/>
+        </Bookmarks>
+      </Unit8>
+      <Unit9>
+        <Filename Value="lib\luaObjectHelper.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="luaObjectHelper"/>
+        <CursorPos X="1" Y="80"/>
+        <TopLine Value="59"/>
+        <UsageCount Value="39"/>
+      </Unit9>
+      <Unit10>
+        <Filename Value="..\..\uWordList.pas"/>
+        <UnitName Value="uWordList"/>
+        <CursorPos X="58" Y="354"/>
+        <TopLine Value="350"/>
+        <UsageCount Value="14"/>
+      </Unit10>
+      <Unit11>
+        <Filename Value="..\..\LuaWrapper.pas"/>
+        <UnitName Value="LuaWrapper"/>
+        <CursorPos X="14" Y="288"/>
+        <TopLine Value="281"/>
+        <UsageCount Value="16"/>
+      </Unit11>
+      <Unit12>
+        <Filename Value="..\..\Demos\Turtle\lib\Turtle.pas"/>
+        <UnitName Value="Turtle"/>
+        <CursorPos X="54" Y="99"/>
+        <TopLine Value="96"/>
+        <UsageCount Value="8"/>
+      </Unit12>
+      <Unit13>
+        <Filename Value="..\..\..\..\..\fpc\2.1.5\source\rtl\win32\classes.pp"/>
+        <UnitName Value="Classes"/>
+        <CursorPos X="13" Y="12"/>
+        <TopLine Value="9"/>
+        <UsageCount Value="9"/>
+      </Unit13>
+      <Unit14>
+        <Filename Value="..\..\pLuaRecord.pas"/>
+        <UnitName Value="pLuaRecord"/>
+        <CursorPos X="20" Y="119"/>
+        <TopLine Value="109"/>
+        <UsageCount Value="14"/>
+      </Unit14>
+      <Unit15>
+        <Filename Value="..\..\..\..\..\fpc\2.1.5\source\rtl\win\sysutils.pp"/>
+        <UnitName Value="sysutils"/>
+        <CursorPos X="1" Y="1"/>
+        <TopLine Value="1"/>
+        <UsageCount Value="9"/>
+      </Unit15>
+      <Unit16>
+        <Filename Value="bin\Test.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Test"/>
+        <CursorPos X="68" Y="5"/>
+        <TopLine Value="1"/>
+        <UsageCount Value="28"/>
+      </Unit16>
+      <Unit17>
+        <Filename Value="..\..\pluaObjectHelper.pas"/>
+        <UnitName Value="pluaObjectHelper"/>
+        <CursorPos X="56" Y="6"/>
+        <TopLine Value="1"/>
+        <UsageCount Value="11"/>
+      </Unit17>
+    </Units>
+    <JumpHistory Count="0" HistoryIndex="-1"/>
+  </ProjectOptions>
+  <CompilerOptions>
+    <Version Value="5"/>
+    <PathDelim Value="\"/>
+    <SearchPaths>
+      <OtherUnitFiles Value="lib\;forms\;..\..\"/>
+      <UnitOutputDirectory Value="bin"/>
+    </SearchPaths>
+    <CodeGeneration>
+      <Generate Value="Faster"/>
+    </CodeGeneration>
+    <Linking>
+      <Options>
+        <Win32>
+          <GraphicApplication Value="True"/>
+        </Win32>
+      </Options>
+    </Linking>
+    <Other>
+      <CompilerPath Value="$(CompPath)"/>
+    </Other>
+  </CompilerOptions>
+  <Debugging>
+    <Watches Count="6">
+      <Item1>
+        <Expression Value="res[0]"/>
+      </Item1>
+      <Item2>
+        <Expression Value="res"/>
+      </Item2>
+      <Item3>
+        <Expression Value="nargs"/>
+      </Item3>
+      <Item4>
+        <Expression Value="result"/>
+      </Item4>
+      <Item5>
+        <Expression Value="results^[0]"/>
+      </Item5>
+      <Item6>
+        <Expression Value="vr"/>
+      </Item6>
+    </Watches>
+    <Exceptions Count="2">
+      <Item1>
+        <Name Value="ECodetoolError"/>
+      </Item1>
+      <Item2>
+        <Name Value="EFOpenError"/>
+      </Item2>
+    </Exceptions>
+  </Debugging>
+</CONFIG>

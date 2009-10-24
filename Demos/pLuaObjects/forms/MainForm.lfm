@@ -1,0 +1,12 @@
+object frmMain: TfrmMain
+  Left = 290
+  Height = 300
+  Top = 149
+  Width = 400
+  HorzScrollBar.Page = 399
+  VertScrollBar.Page = 299
+  Caption = 'frmMain'
+  OnCloseQuery = FormCloseQuery
+  OnCreate = FormCreate
+  OnShow = FormShow
+end

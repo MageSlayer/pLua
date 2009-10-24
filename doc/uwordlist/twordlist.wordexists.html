@@ -1,0 +1,51 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<title>TWordList.WordExists</title>
+<link rel="stylesheet" href="../fpdoc.css" type="text/css">
+</head>
+<body>
+<table class="bar" width="100%" border="0" cellpadding="4" cellspacing="0">
+<tr>
+<td><b>[<a href="../uwordlist/index.html">Overview</a>][<a href="../uwordlist/index-3.html">Types</a>][<a href="../uwordlist/index-4.html">Classes</a>]</b></td>
+<td align="right"><span class="bartitle">Reference for unit 'uWordList' (<a href="../index.html">#pLua</a>)</span></td>
+</tr>
+</table>
+<h1>TWordList.WordExists</h1>
+<p></p>
+<h2>Declaration</h2>
+<p>Source position: uWordList.pas line 78</p>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td><p><tt><span class="code"> <span class="kw">public</span> <span class="kw">function</span> <a href="../uwordlist/twordlist.html">TWordList</a><span class="sym">.</span>WordExists<span class="sym">(</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;<span class="kw">const </span>WhatWord<span class="sym">: </span>AnsiString<span class="sym">;</span></span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code">&nbsp;&nbsp;AllowPartial<span class="sym">: </span>Boolean <span class="sym">=</span> false</span></tt></p></td>
+</tr>
+<tr>
+<td><p><tt><span class="code"><span class="sym">):</span>Boolean<span class="sym">;</span></span></tt></p></td>
+</tr>
+</table>
+<h2>Arguments</h2>
+<table cellpadding="0" cellspacing="0">
+<tr>
+<td valign="top"><p><tt><span class="code">WhatWord</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Word to check for.</p></td>
+</tr>
+<tr>
+<td valign="top"><p><tt><span class="code">AllowPartial</span></tt></p></td>
+<td><p>&nbsp;&nbsp;</p></td>
+<td><p class="cmt">Return if only a partial match is found.  For example, if this flag is set to true and you ask for Dog and the word list finds Doggy but not Dog directly then it will return true.</p></td>
+</tr>
+</table>
+<h2>Function result</h2>
+<p>Returns TRUE if the word exists, or FALSE if it doesn't.</p>
+<h2>Description</h2>
+<p>Check to see if a word exists within the word list. </p>
+</body>
+</html>

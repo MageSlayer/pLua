@@ -1,0 +1,7 @@
+object ScriptEngine: TScriptEngine
+  OnCreate = DataModuleCreate
+  Height = 300
+  HorizontalOffset = 290
+  VerticalOffset = 150
+  Width = 400
+end
