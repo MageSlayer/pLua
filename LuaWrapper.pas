@@ -48,6 +48,7 @@ type
     procedure ErrorTest(errCode : Integer);
     procedure HandleException(E : LuaException);
     procedure SetValue(valName : AnsiString; const AValue: Variant);
+    procedure ExecuteScript(NResults:integer);
   public
     constructor Create{$IFDEF TLuaAsComponent}(anOwner : TComponent); override{$ENDIF};
     {$IFDEF TLuaAsComponent}constructor Create;{$ENDIF}
@@ -59,7 +60,7 @@ type
     procedure LoadScript(Script : AnsiString);
     procedure LoadFile(FileName:AnsiString);
     procedure Execute;
-    function ExecuteAsFunctionObj:TObject;
+    function  ExecuteAsFunctionObj:TObject;
     procedure ExecuteCmd(Script:AnsiString);
     procedure ExecuteFile(FileName : AnsiString);
     procedure RegisterLuaMethod(aMethodName: AnsiString; Func: lua_CFunction);
@@ -160,7 +161,7 @@ begin
   inherited;
 end;
 
-procedure TLUA.Execute;
+procedure TLUA.ExecuteScript(NResults: integer);
 begin
   if L = nil then
     Open;
@@ -171,12 +172,21 @@ begin
       ErrorTest(luaL_loadfile(L, PChar(FLibFile)))
     else
       exit;
-  ErrorTest(lua_pcall(L, 0, 0, 0));
+  ErrorTest(lua_pcall(L, 0, NResults, 0));
+end;
+
+procedure TLUA.Execute;
+begin
+  ExecuteScript(0);
 end;
 
 function TLUA.ExecuteAsFunctionObj: TObject;
+var tix:Integer;
 begin
-
+  ExecuteScript(LUA_MULTRET);
+  tix:=lua_gettop(l);
+  if lua_type(L,-1) = LUA_TTABLE then
+    Result:=plua_getObject(l, tix);
 end;
 
 procedure TLUA.ExecuteCmd(Script: AnsiString);
@@ -446,13 +456,34 @@ begin
 end;
 
 procedure TLUA.ObjArraySet(const varName: String; const A: TObjArray; C: PLuaClassInfo);
+var n:integer;
 begin
+  lua_newtable(L); // table
 
+  for n:=0 to High(A) do
+    begin
+      lua_pushinteger(L, n+1); // table,key
+      pLuaObject.plua_pushexisting(l, A[n], C, true);
+      lua_settable(L,-3); // table
+    end;
+  lua_setglobal( L, PChar(varName) );
 end;
 
 function TLUA.ObjGet(const varName: string): TObject;
+var tblidx:integer;
 begin
-
+  Result:=nil;
+  try
+    lua_pushstring(L, PChar(varName));
+    lua_rawget(L, LUA_GLOBALSINDEX);
+    if lua_istable(L, -1) then
+      begin
+        tblidx:=lua_gettop(L);
+        Result:=plua_getObject(l, tblidx);
+      end;
+  finally
+    lua_pop(L, 1);
+  end;
 end;
 
 function TLUA.TableFunctionExists(TableName,
