@@ -76,6 +76,8 @@ type
     procedure ObjArraySet(const varName:String; const A:TObjArray; C: PLuaClassInfo; FreeGC:boolean = False);
     function  ObjGet(const varName:string):TObject;
 
+    property ScriptText: AnsiString read FScript write FScript;
+    property ScriptFile: AnsiString read FLibFile write FLibFile;
     property LibName  : AnsiString read FLibName write SetLibName;
     property LuaState : Plua_State read L;
     property LuaPath  : AnsiString read GetLuaPath write SetLuaPath;
