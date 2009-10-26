@@ -12,10 +12,13 @@ interface
 uses
   Classes,
   lua,
-  pLua;
+  pLua,
+  pLuaObject;
 
 type
   TLua = class;
+
+  TObjArray = array of TObject;
 
   TLuaOnException = procedure( Title: ansistring; Line: Integer; Msg: ansistring;
                                var handled : Boolean) {$IFDEF TLuaHandlersAsIsObjectType}of object{$ENDIF};
@@ -56,6 +59,7 @@ type
     procedure LoadScript(Script : AnsiString);
     procedure LoadFile(FileName:AnsiString);
     procedure Execute;
+    function ExecuteAsFunctionObj:TObject;
     procedure ExecuteCmd(Script:AnsiString);
     procedure ExecuteFile(FileName : AnsiString);
     procedure RegisterLuaMethod(aMethodName: AnsiString; Func: lua_CFunction);
@@ -68,6 +72,8 @@ type
     function  CallTableFunction( TableName, FunctionName :AnsiString;
                                const Args: array of Variant;
                                Results : PVariantArray = nil):Integer;
+    procedure ObjArraySet(const varName:String; const A:TObjArray; C: PLuaClassInfo);
+    function  ObjGet(const varName:string):TObject;
 
     property LibName  : AnsiString read FLibName write SetLibName;
     property LuaState : Plua_State read L;
@@ -130,7 +136,6 @@ implementation
 uses
   Variants,
   SysUtils,
-  pLuaObject,
   pLuaRecord;
 
 constructor TLUA.Create{$IFDEF TLuaAsComponent}(anOwner: TComponent){$ENDIF};
@@ -167,6 +172,11 @@ begin
     else
       exit;
   ErrorTest(lua_pcall(L, 0, 0, 0));
+end;
+
+function TLUA.ExecuteAsFunctionObj: TObject;
+begin
+
 end;
 
 procedure TLUA.ExecuteCmd(Script: AnsiString);
@@ -433,6 +443,16 @@ begin
     on E: LuaException do
       HandleException(E);
   end;
+end;
+
+procedure TLUA.ObjArraySet(const varName: String; const A: TObjArray; C: PLuaClassInfo);
+begin
+
+end;
+
+function TLUA.ObjGet(const varName: string): TObject;
+begin
+
 end;
 
 function TLUA.TableFunctionExists(TableName,
