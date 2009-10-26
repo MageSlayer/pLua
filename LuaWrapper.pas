@@ -73,7 +73,7 @@ type
     function  CallTableFunction( TableName, FunctionName :AnsiString;
                                const Args: array of Variant;
                                Results : PVariantArray = nil):Integer;
-    procedure ObjArraySet(const varName:String; const A:TObjArray; C: PLuaClassInfo);
+    procedure ObjArraySet(const varName:String; const A:TObjArray; C: PLuaClassInfo; FreeGC:boolean = False);
     function  ObjGet(const varName:string):TObject;
 
     property LibName  : AnsiString read FLibName write SetLibName;
@@ -455,7 +455,7 @@ begin
   end;
 end;
 
-procedure TLUA.ObjArraySet(const varName: String; const A: TObjArray; C: PLuaClassInfo);
+procedure TLUA.ObjArraySet(const varName: String; const A: TObjArray; C: PLuaClassInfo; FreeGC:boolean);
 var n:integer;
 begin
   lua_newtable(L); // table
@@ -463,7 +463,7 @@ begin
   for n:=0 to High(A) do
     begin
       lua_pushinteger(L, n+1); // table,key
-      pLuaObject.plua_pushexisting(l, A[n], C, true);
+      pLuaObject.plua_pushexisting(l, A[n], C, FreeGC);
       lua_settable(L,-3); // table
     end;
   lua_setglobal( L, PChar(varName) );

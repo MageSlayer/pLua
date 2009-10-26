@@ -289,6 +289,7 @@ begin
   instance^.OwnsObject := true;
   instance^.ClassInfo := cInfo;
   instance^.l := l;
+  instance^.Delegate:=nil;
   if cInfo^.New <> nil then
     instance^.obj := cInfo^.New(l, 2, pcount, instance)
   else
@@ -494,6 +495,7 @@ begin
   instance^.ClassInfo := cInfo;
   instance^.l := l;
   instance^.obj := ObjectInstance;
+  instance^.Delegate:=nil;
 
   LuaObjects.Add(pointer(instance));
 
@@ -550,6 +552,7 @@ begin
   instance^.ClassInfo := cInfo;
   instance^.l := l;
   instance^.obj := ObjectInstance;
+  instance^.Delegate := nil;
 
   LuaObjects.Add(pointer(instance));
 
