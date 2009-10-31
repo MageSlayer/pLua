@@ -185,9 +185,11 @@ end;
 function TLUA.ExecuteAsFunctionObj: TObject;
 var tix:Integer;
 begin
+  Result:=nil;
+
   ExecuteScript(LUA_MULTRET);
   tix:=lua_gettop(l);
-  if lua_type(L,-1) = LUA_TTABLE then
+  if lua_type(L,-1) = LUA_TUSERDATA then
     Result:=plua_getObject(l, tix);
 end;
 

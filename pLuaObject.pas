@@ -160,14 +160,25 @@ var
   LuaClasses     : TLuaClassList;
   LuaDelegates   : TList;
   ClassTypesList : TLuaClassTypesList;
+  LogFunction    : procedure (const Text:string) = nil;
 
 implementation
 
 uses
   typinfo;
 
+type
+  PObject = ^TObject;
+
 var
   LuaObjects : TList;
+
+procedure Log(const TextFmt:string; Args:array of const);
+begin
+  //if log handler assigned, then logging
+  if @LogFunction <> nil then
+    LogFunction( Format(TextFmt, Args) );
+end;
 
 function plua_gc_class(l : PLua_State) : integer; cdecl; forward;
 
@@ -270,6 +281,7 @@ var
   cInfo   : PLuaClassInfo;
   instance: PLuaInstanceInfo;
   pcount  : integer;
+  obj_user: PObject;
 begin
   pcount := lua_gettop(l);
   result := 0;
@@ -301,21 +313,8 @@ begin
   lua_rawgeti(l, LUA_REGISTRYINDEX, instance^.LuaRef);
   oidx := lua_gettop(L);
 
-  lua_pushliteral(L, '__instance');
-  lua_pushinteger(L, PtrInt(instance));
-  lua_rawset(l, oidx);
-
-  lua_pushstring(L, 'release');
-  lua_pushcfunction(L, @plua_gc_class);
-  lua_rawset(L, oidx);
-// TODO - Add parent method calls in
-  for i := 0 to Length(cInfo^.Methods)-1 do
-    begin
-      plua_pushstring(L, cInfo^.Methods[i].MethodName);
-      lua_pushinteger(l, PtrInt(cInfo^.Methods[i].wrapper));
-      lua_pushcclosure(L, @plua_call_class_method, 1);
-      lua_rawset(l, -3);
-    end;
+  obj_user:=lua_newuserdata(L, sizeof(PObject));
+  obj_user^:=TObject(instance);
 
   luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
   lua_setmetatable(l, -2);
@@ -357,6 +356,7 @@ begin
   plua_pushstring(l, classInfo.ClassName);
   lua_newtable(l);
 
+  //assign metatable for class with name classInfo.ClassName
   luaL_newmetatable(l, PChar(classInfo.ClassName+'_mt'));
   lua_setmetatable(l, -2);
   lua_settable(l, LUA_GLOBALSINDEX);
@@ -448,23 +448,30 @@ end;
 
 function plua_getObject(l: PLua_State; idx: Integer): TObject;
 var
+  obj_user:PObject;
   instance : PLuaInstanceInfo;
 begin
   result := nil;
-  plua_pushstring(l, '__instance');
-  lua_rawget(l, plua_absindex(l, idx));
-  instance := PLuaInstanceInfo(ptrint(lua_tointeger(l, -1)));
+  instance:=nil;
+
+  obj_user:= lua_touserdata(L, -1);
+  if obj_user <> nil then
+    instance := PLuaInstanceInfo(obj_user^);
+
   lua_pop(l, 1);
   if assigned(instance) and assigned(instance^.obj) then
     result := instance^.obj;
 end;
 
 function plua_getObjectInfo(l: PLua_State; idx: Integer): PLuaInstanceInfo;
+var obj_user:PObject;
 begin
   result := nil;
-  plua_pushstring(l, '__instance');
-  lua_rawget(l, plua_absindex(l, idx));
-  result := PLuaInstanceInfo(ptrint(lua_tointeger(l, -1)));
+
+  obj_user:=lua_touserdata(l, plua_absindex(l, idx));
+  if obj_user <> nil then
+     Result:=PLuaInstanceInfo(obj_user^);
+
   lua_pop(l, 1);
 end;
 
@@ -477,6 +484,7 @@ var
   classPTR: Pointer;
   cInfo   : PLuaClassInfo;
   instance: PLuaInstanceInfo;
+  obj_user: PObject;
 begin
   instance := plua_GetObjectInfo(l, ObjectInstance);
   if assigned(instance) then
@@ -499,28 +507,8 @@ begin
 
   LuaObjects.Add(pointer(instance));
 
-  plua_pushstring(l, InstanceName);
-  lua_newtable(L);
-  instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
-  lua_rawgeti(l, LUA_REGISTRYINDEX, instance^.LuaRef);
-  oidx := lua_gettop(L);
-
-  lua_pushliteral(L, '__instance');
-  lua_pushinteger(L, PtrInt(instance));
-  lua_rawset(l, oidx);
-
-  lua_pushstring(L, 'release');
-  lua_pushcfunction(L, @plua_gc_class);
-  lua_rawset(L, oidx);
-
-// TODO - Add parent method calls in
-  for i := 0 to Length(cInfo^.Methods)-1 do
-    begin
-      plua_pushstring(L, cInfo^.Methods[i].MethodName);
-      lua_pushinteger(l, PtrInt(cInfo^.Methods[i].wrapper));
-      lua_pushcclosure(L, @plua_call_class_method, 1);
-      lua_rawset(l, -3);
-    end;
+  obj_user:=lua_newuserdata(L, sizeof(PObject));
+  obj_user^:=TObject(instance);
 
   luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
   lua_setmetatable(l, -2);
@@ -536,6 +524,7 @@ var
   classPTR: Pointer;
   cInfo   : PLuaClassInfo;
   instance: PLuaInstanceInfo;
+  obj_user: PObject;
 begin
   instance := plua_GetObjectInfo(l, ObjectInstance);
   if assigned(instance) then
@@ -556,27 +545,8 @@ begin
 
   LuaObjects.Add(pointer(instance));
 
-  lua_newtable(L);
-  instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
-  lua_rawgeti(l, LUA_REGISTRYINDEX, instance^.LuaRef);
-  oidx := lua_gettop(L);
-
-  lua_pushliteral(L, '__instance');
-  lua_pushinteger(L, PtrInt(instance));
-  lua_rawset(l, oidx);
-
-  lua_pushstring(L, 'release');
-  lua_pushcfunction(L, @plua_gc_class);
-  lua_rawset(L, oidx);
-
-// TODO - Add parent method calls in
-  for i := 0 to Length(cInfo^.Methods)-1 do
-    begin
-      plua_pushstring(L, cInfo^.Methods[i].MethodName);
-      lua_pushinteger(l, PtrInt(cInfo^.Methods[i].wrapper));
-      lua_pushcclosure(L, @plua_call_class_method, 1);
-      lua_rawset(l, -3);
-    end;
+  obj_user:=lua_newuserdata(L, sizeof(PObject));
+  obj_user^:=TObject(instance);
 
   luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
   lua_setmetatable(l, -2);
@@ -912,6 +882,9 @@ initialization
   ClassTypesList := TLuaClassTypesList.Create;
 
 finalization
+  if LuaObjects.Count > 0 then
+    Log('Warning!!! %d objects left unfreed.', [LuaObjects.Count]);
+
   while LuaObjects.Count > 0 do
     begin
       instance := PLuaInstanceInfo(LuaObjects[LuaObjects.Count-1]);
