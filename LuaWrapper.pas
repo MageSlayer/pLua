@@ -460,15 +460,17 @@ begin
 end;
 
 procedure TLUA.ObjArraySet(const varName: String; const A: TObjArray; C: PLuaClassInfo; FreeGC:boolean);
-var n:integer;
+var n, tix:integer;
 begin
   lua_newtable(L); // table
+  tix:=lua_gettop(l);
 
   for n:=0 to High(A) do
     begin
       lua_pushinteger(L, n+1); // table,key
       pLuaObject.plua_pushexisting(l, A[n], C, FreeGC);
-      lua_settable(L,-3); // table
+      //lua_settable(L,-3); // table
+      lua_settable(L,tix); // table
     end;
   lua_setglobal( L, PChar(varName) );
 end;

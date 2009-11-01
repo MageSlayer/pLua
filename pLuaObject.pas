@@ -131,7 +131,7 @@ procedure plua_AddClassMethod( var ClassInfo : TLuaClassInfo;
                                methodName : AnsiString;
                                wrapper : plua_MethodWrapper );
 
-function plua_getObject( l : PLua_State; idx : Integer) : TObject;
+function plua_getObject( l : PLua_State; idx : Integer; PopValue:boolean = True) : TObject;
 function plua_getObjectInfo( l : PLua_State; idx : Integer) : PLuaInstanceInfo;
 
 function plua_registerExisting( l : PLua_State; InstanceName : AnsiString;
@@ -173,11 +173,16 @@ type
 var
   LuaObjects : TList;
 
-procedure Log(const TextFmt:string; Args:array of const);
+procedure Log(const Text:string);
 begin
   //if log handler assigned, then logging
   if @LogFunction <> nil then
-    LogFunction( Format(TextFmt, Args) );
+    LogFunction( Text );
+end;
+
+procedure Log(const TextFmt:string; Args:array of const);
+begin
+  Log( Format(TextFmt, Args) );
 end;
 
 function plua_gc_class(l : PLua_State) : integer; cdecl; forward;
@@ -351,6 +356,8 @@ var
   lidx, tidx, midx, i : integer;
   ci   : PLuaClassInfo;
 begin
+  Log('Registering class %s.', [classInfo.ClassName]);
+
   lidx := LuaClasses.Add(classInfo);
 
   plua_pushstring(l, classInfo.ClassName);
@@ -393,6 +400,19 @@ begin
   lua_pushstring(L, '__newindex');
   lua_pushcfunction(L, @plua_newindex_class);
   lua_rawset(L, midx);
+
+  Log('Registering class methods.');
+  // TODO - Add parent method calls in
+  for i := 0 to Length(classInfo.Methods)-1 do
+    begin
+      plua_pushstring(L, classInfo.Methods[i].MethodName);
+      lua_pushinteger(l, PtrInt(classInfo.Methods[i].wrapper));
+      lua_pushcclosure(L, @plua_call_class_method, 1);
+      lua_rawset(l, -3);
+    end;
+  Log('Registering class methods - done.');
+
+  Log('Registering - done.');
 end;
 
 procedure plua_newClassInfo(var ClassInfoPointer: PLuaClassInfo);
@@ -446,7 +466,7 @@ begin
   ClassInfo.Methods[idx].wrapper    := wrapper;
 end;
 
-function plua_getObject(l: PLua_State; idx: Integer): TObject;
+function plua_getObject(l: PLua_State; idx: Integer; PopValue:boolean): TObject;
 var
   obj_user:PObject;
   instance : PLuaInstanceInfo;
@@ -454,11 +474,12 @@ begin
   result := nil;
   instance:=nil;
 
-  obj_user:= lua_touserdata(L, -1);
+  obj_user:= lua_touserdata(L, idx);
   if obj_user <> nil then
     instance := PLuaInstanceInfo(obj_user^);
 
-  lua_pop(l, 1);
+  if PopValue then
+    lua_pop(l, 1);
   if assigned(instance) and assigned(instance^.obj) then
     result := instance^.obj;
 end;
