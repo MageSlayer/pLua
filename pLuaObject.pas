@@ -121,7 +121,9 @@ type
 procedure plua_registerclass( l : PLua_State; classInfo : TLuaClassInfo);
 procedure plua_newClassInfo( var ClassInfoPointer : PLuaClassInfo);
 procedure plua_initClassInfo( var ClassInfo : TLuaClassInfo);
-procedure plua_releaseClassInfo( var ClassInfoPointer : PLuaClassInfo);
+
+procedure plua_releaseClassInfo( var ClassInfoPointer : PLuaClassInfo);overload;
+procedure plua_releaseClassInfo(var ClassInfoPointer: TLuaClassInfo);overload;
 
 procedure plua_AddClassProperty( var ClassInfo : TLuaClassInfo;
                                  propertyName : AnsiString;
@@ -358,6 +360,9 @@ var
 begin
   Log('Registering class %s.', [classInfo.ClassName]);
 
+  //skip re-registering classes.
+  if LuaClasses.IndexOf( classinfo.ClassName ) <> -1 then Exit;
+
   lidx := LuaClasses.Add(classInfo);
 
   plua_pushstring(l, classInfo.ClassName);
@@ -439,6 +444,13 @@ procedure plua_releaseClassInfo(var ClassInfoPointer: PLuaClassInfo);
 begin
   ClassInfoPointer^.PropHandlers.Free;
   Freemem(ClassInfoPointer);
+  ClassInfoPointer:=nil;
+end;
+
+procedure plua_releaseClassInfo(var ClassInfoPointer: TLuaClassInfo);
+begin
+  ClassInfoPointer.PropHandlers.Free;
+  ClassInfoPointer.PropHandlers:=nil;
 end;
 
 procedure plua_AddClassProperty(var ClassInfo: TLuaClassInfo;
