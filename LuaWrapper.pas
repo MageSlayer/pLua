@@ -50,7 +50,7 @@ type
     procedure SetValue(valName : AnsiString; const AValue: Variant);
     procedure ExecuteScript(NResults:integer);
   public
-    constructor Create{$IFDEF TLuaAsComponent}(anOwner : TComponent); override{$ENDIF};
+    constructor Create{$IFDEF TLuaAsComponent}(anOwner : TComponent); override;{$ENDIF}
     {$IFDEF TLuaAsComponent}constructor Create;{$ENDIF}
     destructor Destroy; override;
 
@@ -73,8 +73,10 @@ type
     function  CallTableFunction( TableName, FunctionName :AnsiString;
                                const Args: array of Variant;
                                Results : PVariantArray = nil):Integer;
+
     procedure ObjArraySet(const varName:String; const A:TObjArray; C: PLuaClassInfo; FreeGC:boolean = False);
     function  ObjGet(const varName:string):TObject;
+    procedure GlobalObjClear;
 
     property ScriptText: AnsiString read FScript write FScript;
     property ScriptFile: AnsiString read FLibFile write FLibFile;
@@ -490,6 +492,11 @@ begin
   finally
     lua_pop(L, 1);
   end;
+end;
+
+procedure TLUA.GlobalObjClear;
+begin
+  plua_ClearObjects(l);
 end;
 
 function TLUA.TableFunctionExists(TableName,
