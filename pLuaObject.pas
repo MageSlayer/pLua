@@ -184,7 +184,9 @@ end;
 
 procedure Log(const TextFmt:string; Args:array of const);
 begin
+  {$IFDEF DEBUG_LUA}
   Log( Format(TextFmt, Args) );
+  {$ENDIF}
 end;
 
 function plua_gc_class(l : PLua_State) : integer; cdecl; forward;
