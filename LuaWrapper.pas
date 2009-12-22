@@ -56,6 +56,7 @@ type
 
     procedure Close;
     procedure Open;
+    procedure GarbageCollect;
 
     procedure LoadScript(Script : AnsiString);
     procedure LoadFile(FileName:AnsiString);
@@ -186,13 +187,23 @@ end;
 
 function TLUA.ExecuteAsFunctionObj: TObject;
 var tix:Integer;
+    StartTop:integer;
 begin
   Result:=nil;
-
-  ExecuteScript(LUA_MULTRET);
-  tix:=lua_gettop(l);
-  if lua_type(L,-1) = LUA_TUSERDATA then
-    Result:=plua_getObject(l, tix);
+  StartTop:=lua_gettop(l);
+  try
+    ExecuteScript(LUA_MULTRET);
+    tix:=lua_gettop(l);
+    if tix > 0 then
+      begin
+        if lua_type(L,-1) = LUA_TUSERDATA then
+          Result:=plua_getObject(l, tix)
+          else
+          lua_pop(l, 1);
+      end;
+  finally
+    plua_CheckStackBalance(l, StartTop);
+  end;
 end;
 
 procedure TLUA.ExecuteCmd(Script: AnsiString);
@@ -236,24 +247,39 @@ begin
 end;
 
 procedure TLUA.LoadFile(FileName: AnsiString);
+var StartTop:integer;
 begin
   if L = nil then
     Open;
-  FLibFile := FileName;
-  FScript := '';
-  luaL_loadfile(L, PChar(FileName));
+
+  StartTop:=lua_gettop(l);
+  try
+    FLibFile := FileName;
+    FScript := '';
+    luaL_loadfile(L, PChar(FileName));
+  finally
+    plua_CheckStackBalance(l, StartTop+1);
+  end;
 end;
 
 procedure TLUA.LoadScript(Script: AnsiString);
+var StartTop:integer;
 begin
   if FScript <> Script then
     Close;
+
   if L = nil then
     Open;
-  FScript := Trim(Script);
-  FLibFile := '';
-  if FScript <> '' then
-    luaL_loadbuffer(L, PChar(Script), length(Script), PChar(LibName));
+
+  StartTop:=lua_gettop(l);
+  try
+    FScript := Trim(Script);
+    FLibFile := '';
+    if FScript <> '' then
+      luaL_loadbuffer(L, PChar(Script), length(Script), PChar(LibName));
+  finally
+    plua_CheckStackBalance(l, StartTop);
+  end;
 end;
 
 function TLUA.FunctionExists(aMethodName: AnsiString): Boolean;
@@ -305,14 +331,20 @@ begin
 end;
 
 function TLUA.GetValue(valName : AnsiString): Variant;
+var StartTop:Integer;
 begin
-  result := NULL;
-  lua_pushstring(l, PChar(valName));
-  lua_rawget(l, LUA_GLOBALSINDEX);
+  StartTop:=lua_gettop(l);
   try
-    result := plua_tovariant(l, -1);
+    result := NULL;
+    lua_pushstring(l, PChar(valName));
+    lua_rawget(l, LUA_GLOBALSINDEX);
+    try
+      result := plua_tovariant(l, -1);
+    finally
+      lua_pop(l, 1);
+    end;
   finally
-    lua_pop(l, 1);
+    plua_CheckStackBalance(l, StartTop);
   end;
 end;
 
@@ -356,6 +388,12 @@ begin
     Close;
   L := lua_open;
   OpenLibs;
+end;
+
+procedure TLUA.GarbageCollect;
+begin
+  if l <> nil then
+    lua_gc(l, LUA_GCCOLLECT, 0);
 end;
 
 procedure TLUA.OpenLibs;
@@ -426,19 +464,25 @@ begin
 end;
 
 procedure TLUA.SetValue(valName : AnsiString; const AValue: Variant);
+var StartTop:Integer;
 begin
-  if VarIsType(AValue, varString) then
-    begin
-      lua_pushliteral(l, PChar(valName));
-      lua_pushstring(l, PChar(AnsiString(AValue)));
-      lua_settable(L, LUA_GLOBALSINDEX);
-    end
-  else
-    begin
-      lua_pushliteral(l, PChar(valName));
-      plua_pushvariant(l, AValue);
-      lua_settable(L, LUA_GLOBALSINDEX);
-    end;
+  StartTop:=lua_gettop(l);
+  try
+    if VarIsType(AValue, varString) then
+      begin
+        lua_pushliteral(l, PChar(valName));
+        lua_pushstring(l, PChar(AnsiString(AValue)));
+        lua_settable(L, LUA_GLOBALSINDEX);
+      end
+    else
+      begin
+        lua_pushliteral(l, PChar(valName));
+        plua_pushvariant(l, AValue);
+        lua_settable(L, LUA_GLOBALSINDEX);
+      end;
+  finally
+    plua_CheckStackBalance(l, StartTop);
+  end;
 end;
 
 function TLUA.CallTableFunction(TableName, FunctionName: AnsiString;
@@ -463,18 +507,24 @@ end;
 
 procedure TLUA.ObjArraySet(const varName: String; const A: TObjArray; C: PLuaClassInfo; FreeGC:boolean);
 var n, tix:integer;
+    StartTop:integer;
 begin
-  lua_newtable(L); // table
-  tix:=lua_gettop(l);
+  StartTop:=lua_gettop(l);
+  try
+    lua_newtable(L); // table
+    tix:=lua_gettop(l);
 
-  for n:=0 to High(A) do
-    begin
-      lua_pushinteger(L, n+1); // table,key
-      pLuaObject.plua_pushexisting(l, A[n], C, FreeGC);
-      //lua_settable(L,-3); // table
-      lua_settable(L,tix); // table
-    end;
-  lua_setglobal( L, PChar(varName) );
+    for n:=0 to High(A) do
+      begin
+        lua_pushinteger(L, n+1); // table,key
+        pLuaObject.plua_pushexisting(l, A[n], C, FreeGC);
+        //lua_settable(L,-3); // table
+        lua_settable(L,tix); // table
+      end;
+    lua_setglobal( L, PChar(varName) );
+  finally
+    plua_CheckStackBalance(l, StartTop);
+  end;
 end;
 
 function TLUA.ObjGet(const varName: string): TObject;
