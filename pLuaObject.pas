@@ -118,6 +118,7 @@ type
     property Count : Integer read GetCount;
   end;
 
+procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer);
 procedure plua_registerclass( l : PLua_State; classInfo : TLuaClassInfo);
 procedure plua_newClassInfo( var ClassInfoPointer : PLuaClassInfo);
 procedure plua_initClassInfo( var ClassInfo : TLuaClassInfo);
@@ -162,7 +163,8 @@ var
   LuaClasses     : TLuaClassList;
   LuaDelegates   : TList;
   ClassTypesList : TLuaClassTypesList;
-  LogFunction    : procedure (const Text:string) = nil;
+  LogFunction             : procedure (const Text:string) = nil;
+  DumpStackTraceFunction  : procedure = nil;
 
 implementation
 
@@ -180,6 +182,12 @@ begin
   //if log handler assigned, then logging
   if @LogFunction <> nil then
     LogFunction( Text );
+end;
+
+procedure DumpStackTrace;
+begin
+  if @DumpStackTraceFunction <> nil then
+    DumpStackTraceFunction;
 end;
 
 procedure Log(const TextFmt:string; Args:array of const);
@@ -282,6 +290,14 @@ begin
     result := method(obj, l, 2, pcount);
 end;
 
+procedure LuaObjects_Add(instance:pointer);
+begin
+  LuaObjects.Add(pointer(instance));
+  {$IFDEF DEBUG_LUA}
+  DumpStackTrace;
+  {$ENDIF}
+end;
+
 function plua_new_class(l : PLua_State) : integer; cdecl;
 var
   i, n, tidx, midx, classID,
@@ -315,7 +331,7 @@ begin
     instance^.obj := cInfo^.New(l, 2, pcount, instance)
   else
     instance^.obj := TObject.Create;
-  LuaObjects.Add(pointer(instance));
+  LuaObjects_Add(pointer(instance));
 
   lua_newtable(L);
   instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
@@ -355,9 +371,10 @@ begin
   result := 0;
 end;
 
+(*
 procedure plua_registerclass(l: PLua_State; classInfo: TLuaClassInfo);
 var
-  lidx, tidx, midx, i : integer;
+  lidx, {tidx, }midx, i, classtableidx : integer;
   ci   : PLuaClassInfo;
 begin
   Log('Registering class %s.', [classInfo.ClassName]);
@@ -367,28 +384,42 @@ begin
 
   lidx := LuaClasses.Add(classInfo);
 
+  {
   plua_pushstring(l, classInfo.ClassName);
   lua_newtable(l);
+  classtableidx:=lua_gettop(l);
+  }
 
   //assign metatable for class with name classInfo.ClassName
   luaL_newmetatable(l, PChar(classInfo.ClassName+'_mt'));
-  lua_setmetatable(l, -2);
-  lua_settable(l, LUA_GLOBALSINDEX);
-  
+  //lua_setmetatable(l, -2);
+  //lua_setmetatable(l, classtableidx);
+
+  {lua_settable(l, LUA_GLOBALSINDEX);}
+
+  {
   luaL_getmetatable(l, PChar(classInfo.ClassName+'_mt'));
   midx := lua_gettop(l);
+  }
 
+  {
   plua_pushstring(l, classInfo.ClassName);
   lua_gettable(l, LUA_GLOBALSINDEX);
   tidx := lua_gettop(l);
+  }
 
+  {
   lua_pushstring(L, '__call');
   lua_pushcfunction(L, @plua_new_class);
   lua_rawset(L, midx);
+  }
+
   lua_pushstring(L, '__gc');
   lua_pushcfunction(L, @plua_gc_class);
-  lua_rawset(L, midx);
+  { lua_rawset(L, midx); }
+  lua_settable(L, -3);
 
+  {
   lua_pushstring(L, 'new');
   lua_pushcfunction(L, @plua_new_class);
   lua_rawset(L, tidx);
@@ -417,7 +448,96 @@ begin
       lua_pushcclosure(L, @plua_call_class_method, 1);
       lua_rawset(l, -3);
     end;
+  }
   Log('Registering class methods - done.');
+
+  Log('Registering - done.');
+end;
+*)
+
+(*
+procedure plua_registerclass(l: PLua_State; classInfo: TLuaClassInfo);
+const
+  MetaMethods:array[0..1] of luaL_Reg =
+  (
+    (name : '__gc'; func: @plua_gc_class),
+    (name : nil; func: nil)
+  );
+  ClassMethods:array[0..1] of luaL_Reg =
+  (
+    (name : 'new'; func: @plua_new_class),
+    (name : nil; func: nil)
+  );
+begin
+  Log('Registering class %s.', [classInfo.ClassName]);
+
+  //skip re-registering classes.
+  if LuaClasses.IndexOf( classinfo.ClassName ) <> -1 then Exit;
+
+  {lidx := }LuaClasses.Add(classInfo);
+
+  luaL_openlib(L, PChar(classInfo.ClassName), ClassMethods, 0);  //* create methods table, add it to the globals */
+
+  luaL_newmetatable(l, PChar(classInfo.ClassName+'_mt'));
+
+  luaL_openlib(L, nil, MetaMethods, 0);  //* fill metatable */
+  lua_pushliteral(L, '__index');
+  lua_pushvalue(L, -3);               //* dup methods table*/
+  lua_rawset(L, -3);                  //* metatable.__index = methods */
+  lua_pushliteral(L, '__metatable');
+  lua_pushvalue(L, -3);               //* dup methods table*/
+  lua_rawset(L, -3);                  //* hide metatable:
+                                      //   metatable.__metatable = methods */
+  lua_pop(L, 1);                      //* drop metatable */
+
+  Log('Registering - done.');
+end;
+*)
+
+procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer);
+var CurStack:Integer;
+begin
+  CurStack:=lua_gettop(l);
+  if CurStack <> TopToBe then
+    raise Exception.CreateFmt('Lua stack is unbalanced. %d, should be %d', [CurStack, TopToBe]);
+end;
+
+procedure plua_registerclass(l: PLua_State; classInfo: TLuaClassInfo);
+var midx, StartTop : integer;
+begin
+  Log('Registering class %s.', [classInfo.ClassName]);
+
+  StartTop := lua_gettop(l);
+  try
+    //skip re-registering classes.
+    if LuaClasses.IndexOf( classinfo.ClassName ) <> -1 then Exit;
+
+    {lidx := }LuaClasses.Add(classInfo);
+
+    plua_pushstring(l, classInfo.ClassName);
+    lua_newtable(l);
+
+    if luaL_newmetatable(l, PChar(classInfo.ClassName+'_mt')) <> 1 then
+      raise Exception.Create('Cannot create metatable');
+
+    lua_setmetatable(l, -2);
+    lua_settable(l, LUA_GLOBALSINDEX);
+
+    luaL_getmetatable(l, PChar(classInfo.ClassName+'_mt'));
+    midx := lua_gettop(l);
+
+    lua_pushstring(L, '__call');
+    lua_pushcfunction(L, @plua_new_class);
+    lua_rawset(L, midx);
+    lua_pushstring(L, '__gc');
+    lua_pushcfunction(L, @plua_gc_class);
+    lua_rawset(L, midx);
+
+    lua_pop(l, 1);
+
+  finally
+    plua_CheckStackBalance(l, StartTop);
+  end;
 
   Log('Registering - done.');
 end;
@@ -530,6 +650,10 @@ begin
       exit;
     end;
 
+  {$IFDEF DEBUG_LUA}
+  Log('plua_registerExisting. Object $%x', [PtrInt(ObjectInstance)]);
+  {$ENDIF}
+
   cInfo := classInfo;
 
   new(instance);
@@ -540,7 +664,7 @@ begin
   instance^.obj := ObjectInstance;
   instance^.Delegate:=nil;
 
-  LuaObjects.Add(pointer(instance));
+  LuaObjects_Add(pointer(instance));
 
   obj_user:=lua_newuserdata(L, sizeof(PObject));
   obj_user^:=TObject(instance);
@@ -555,36 +679,45 @@ function plua_pushexisting(l: PLua_State; ObjectInstance: TObject;
   classInfo: PLuaClassInfo; FreeOnGC: Boolean): PLuaInstanceInfo;
 var
   i, n, tidx, midx, classID,
-  oidx    : Integer;
+  oidx, StartTop : Integer;
   classPTR: Pointer;
   cInfo   : PLuaClassInfo;
   instance: PLuaInstanceInfo;
   obj_user: PObject;
 begin
-  instance := plua_GetObjectInfo(l, ObjectInstance);
-  if assigned(instance) then
-    begin
-      plua_PushObject(instance);
-      exit;
-    end;
-    
-  cInfo := classInfo;
+  StartTop:=lua_gettop(l);
+  try
+    instance := plua_GetObjectInfo(l, ObjectInstance);
+    if assigned(instance) then
+      begin
+        plua_PushObject(instance);
+        exit;
+      end;
 
-  new(instance);
-  result := instance;
-  instance^.OwnsObject := FreeOnGC;
-  instance^.ClassInfo := cInfo;
-  instance^.l := l;
-  instance^.obj := ObjectInstance;
-  instance^.Delegate := nil;
+    {$IFDEF DEBUG_LUA}
+    Log('plua_pushexisting. Object $%x', [PtrInt(ObjectInstance)]);
+    {$ENDIF}
 
-  LuaObjects.Add(pointer(instance));
+    cInfo := classInfo;
 
-  obj_user:=lua_newuserdata(L, sizeof(PObject));
-  obj_user^:=TObject(instance);
+    new(instance);
+    result := instance;
+    instance^.OwnsObject := FreeOnGC;
+    instance^.ClassInfo := cInfo;
+    instance^.l := l;
+    instance^.obj := ObjectInstance;
+    instance^.Delegate := nil;
 
-  luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
-  lua_setmetatable(l, -2);
+    LuaObjects_Add(pointer(instance));
+
+    obj_user:=lua_newuserdata(L, sizeof(PObject));
+    obj_user^:=TObject(instance);
+
+    luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
+    lua_setmetatable(l, -2);
+  finally
+    plua_CheckStackBalance(l, StartTop + 1);
+  end;
 end;
 
 function plua_PushObject(ObjectInfo: PLuaInstanceInfo) : Boolean;
@@ -923,6 +1056,8 @@ finalization
   while LuaObjects.Count > 0 do
     begin
       instance := PLuaInstanceInfo(LuaObjects[LuaObjects.Count-1]);
+      Log('Freeing class "%s" instance.', [instance^.obj.ClassName]);
+
       LuaObjects.Delete(LuaObjects.Count-1);
       if instance^.OwnsObject then
         begin
@@ -935,6 +1070,7 @@ finalization
         Instance^.Delegate.Free;
       Freemem(instance);
     end;
+
   LuaObjects.Free;
   LuaObjects := nil;
   ClassTypesList.Free;
@@ -942,5 +1078,5 @@ finalization
   LuaClasses := nil;
   LuaDelegates.Free;
   LuaDelegates := nil;
-  
+
 end.

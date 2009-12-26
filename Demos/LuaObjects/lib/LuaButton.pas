@@ -18,9 +18,9 @@ type
     function  GetPropValue(propName : AnsiString): Variant; override;
     function  SetPropValue(PropName : AnsiString; const AValue: Variant) : Boolean; override;
   public
+    btn : TButton;
     destructor Destroy; override;
     procedure Click;
-    btn : TButton;
   end;
 
 procedure RegisterLuaButton(L : Plua_State);

@@ -2,12 +2,13 @@
 <CONFIG>
   <ProjectOptions>
     <PathDelim Value="\"/>
-    <Version Value="5"/>
+    <Version Value="7"/>
     <General>
+      <Flags>
+        <LRSInOutputDirectory Value="False"/>
+      </Flags>
       <MainUnit Value="0"/>
-      <IconPath Value="./"/>
       <TargetFileExt Value=".exe"/>
-      <ActiveEditorIndexAtStart Value="3"/>
     </General>
     <VersionInfo>
       <ProjectVersion Value=""/>
@@ -23,7 +24,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
+        <LaunchingApplication PathPlusParams="\usr\X11R6\bin\xterm -T 'Lazarus Run Output' -e $(LazarusDir)\tools\runwait.sh $(TargetCmdLine)"/>
       </local>
     </RunParams>
     <RequiredPackages Count="1">
@@ -36,59 +37,49 @@
         <Filename Value="pLuaRecords.lpr"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="pLuaRecords"/>
-        <UsageCount Value="24"/>
+        <UsageCount Value="25"/>
       </Unit0>
       <Unit1>
         <Filename Value="forms\MainForm.pas"/>
-        <ComponentName Value="Form1"/>
         <IsPartOfProject Value="True"/>
-        <ResourceFilename Value="forms\MainForm.lrs"/>
+        <ComponentName Value="Form1"/>
+        <ResourceBaseClass Value="Form"/>
         <UnitName Value="MainForm"/>
-        <CursorPos X="35" Y="57"/>
-        <TopLine Value="49"/>
-        <EditorIndex Value="0"/>
-        <UsageCount Value="24"/>
-        <Loaded Value="True"/>
+        <CursorPos X="28" Y="62"/>
+        <TopLine Value="55"/>
+        <UsageCount Value="25"/>
       </Unit1>
       <Unit2>
         <Filename Value="..\..\pLuaRecord.pas"/>
         <UnitName Value="pLuaRecord"/>
-        <CursorPos X="69" Y="241"/>
-        <TopLine Value="235"/>
-        <EditorIndex Value="3"/>
+        <CursorPos X="1" Y="374"/>
+        <TopLine Value="224"/>
         <UsageCount Value="12"/>
         <Bookmarks Count="1">
           <Item0 X="32" Y="338" ID="1"/>
         </Bookmarks>
-        <Loaded Value="True"/>
       </Unit2>
       <Unit3>
         <Filename Value="..\..\pLua.pas"/>
         <UnitName Value="pLua"/>
         <CursorPos X="1" Y="1"/>
         <TopLine Value="279"/>
-        <EditorIndex Value="5"/>
         <UsageCount Value="12"/>
-        <Loaded Value="True"/>
       </Unit3>
       <Unit4>
         <Filename Value="lib\RecTest.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="RecTest"/>
-        <CursorPos X="39" Y="72"/>
-        <TopLine Value="57"/>
-        <EditorIndex Value="2"/>
-        <UsageCount Value="24"/>
-        <Loaded Value="True"/>
+        <CursorPos X="1" Y="72"/>
+        <TopLine Value="54"/>
+        <UsageCount Value="25"/>
       </Unit4>
       <Unit5>
         <Filename Value="..\..\uWordList.pas"/>
         <UnitName Value="uWordList"/>
         <CursorPos X="30" Y="127"/>
         <TopLine Value="1"/>
-        <EditorIndex Value="4"/>
         <UsageCount Value="11"/>
-        <Loaded Value="True"/>
       </Unit5>
       <Unit6>
         <Filename Value="..\..\pLuaObject.pas"/>
@@ -100,146 +91,20 @@
       <Unit7>
         <Filename Value="..\..\LuaWrapper.pas"/>
         <UnitName Value="LuaWrapper"/>
-        <CursorPos X="19" Y="169"/>
-        <TopLine Value="173"/>
-        <EditorIndex Value="1"/>
+        <CursorPos X="1" Y="425"/>
+        <TopLine Value="407"/>
         <UsageCount Value="11"/>
-        <Loaded Value="True"/>
       </Unit7>
     </Units>
-    <JumpHistory Count="30" HistoryIndex="29">
-      <Position1>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="346" Column="1" TopLine="325"/>
-      </Position1>
-      <Position2>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="347" Column="1" TopLine="326"/>
-      </Position2>
-      <Position3>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="349" Column="1" TopLine="328"/>
-      </Position3>
-      <Position4>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="350" Column="1" TopLine="334"/>
-      </Position4>
-      <Position5>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="352" Column="1" TopLine="331"/>
-      </Position5>
-      <Position6>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="353" Column="1" TopLine="332"/>
-      </Position6>
-      <Position7>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="362" Column="30" TopLine="331"/>
-      </Position7>
-      <Position8>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="249" Column="10" TopLine="224"/>
-      </Position8>
-      <Position9>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="340" Column="1" TopLine="319"/>
-      </Position9>
-      <Position10>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="211" Column="26" TopLine="203"/>
-      </Position10>
-      <Position11>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="201" Column="54" TopLine="184"/>
-      </Position11>
-      <Position12>
-        <Filename Value="forms\MainForm.pas"/>
-        <Caret Line="70" Column="9" TopLine="49"/>
-      </Position12>
-      <Position13>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="253" Column="38" TopLine="230"/>
-      </Position13>
-      <Position14>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="237" Column="77" TopLine="228"/>
-      </Position14>
-      <Position15>
-        <Filename Value="forms\MainForm.pas"/>
-        <Caret Line="61" Column="19" TopLine="49"/>
-      </Position15>
-      <Position16>
-        <Filename Value="lib\RecTest.pas"/>
-        <Caret Line="94" Column="19" TopLine="62"/>
-      </Position16>
-      <Position17>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="100" Column="75" TopLine="76"/>
-      </Position17>
-      <Position18>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="105" Column="81" TopLine="84"/>
-      </Position18>
-      <Position19>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="113" Column="85" TopLine="92"/>
-      </Position19>
-      <Position20>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="114" Column="62" TopLine="93"/>
-      </Position20>
-      <Position21>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="97" Column="10" TopLine="76"/>
-      </Position21>
-      <Position22>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="100" Column="91" TopLine="79"/>
-      </Position22>
-      <Position23>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="105" Column="81" TopLine="84"/>
-      </Position23>
-      <Position24>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="113" Column="85" TopLine="92"/>
-      </Position24>
-      <Position25>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="114" Column="62" TopLine="93"/>
-      </Position25>
-      <Position26>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="340" Column="12" TopLine="330"/>
-      </Position26>
-      <Position27>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="343" Column="15" TopLine="322"/>
-      </Position27>
-      <Position28>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="262" Column="21" TopLine="241"/>
-      </Position28>
-      <Position29>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="369" Column="30" TopLine="347"/>
-      </Position29>
-      <Position30>
-        <Filename Value="..\..\pLuaRecord.pas"/>
-        <Caret Line="256" Column="24" TopLine="224"/>
-      </Position30>
-    </JumpHistory>
+    <JumpHistory Count="0" HistoryIndex="-1"/>
   </ProjectOptions>
   <CompilerOptions>
-    <Version Value="5"/>
+    <Version Value="8"/>
     <PathDelim Value="\"/>
     <SearchPaths>
       <OtherUnitFiles Value="..\..\;lib\;forms\"/>
       <UnitOutputDirectory Value="bin"/>
     </SearchPaths>
-    <CodeGeneration>
-      <Generate Value="Faster"/>
-    </CodeGeneration>
     <Linking>
       <Options>
         <Win32>
@@ -252,23 +117,11 @@
     </Other>
   </CompilerOptions>
   <Debugging>
-    <BreakPoints Count="4">
+    <BreakPoints Count="1">
       <Item1>
-        <Source Value="..\..\pLuaRecord.pas"/>
-        <Line Value="249"/>
-      </Item1>
-      <Item2>
-        <Source Value="..\..\pLuaRecord.pas"/>
-        <Line Value="205"/>
-      </Item2>
-      <Item3>
-        <Source Value="..\..\pLuaRecord.pas"/>
-        <Line Value="340"/>
-      </Item3>
-      <Item4>
         <Source Value="lib\RecTest.pas"/>
         <Line Value="72"/>
-      </Item4>
+      </Item1>
     </BreakPoints>
     <Watches Count="6">
       <Item1>

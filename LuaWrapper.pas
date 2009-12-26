@@ -170,6 +170,10 @@ procedure TLUA.ExecuteScript(NResults: integer);
 begin
   if L = nil then
     Open;
+
+  if lua_gettop(l) <= 0 then
+     raise Exception.Create('No script is loaded at stack');
+  {--
   if FScript <> '' then
     ErrorTest(luaL_loadbuffer(L, PChar(FScript), length(FScript), PChar(LibName)))
   else
@@ -177,6 +181,7 @@ begin
       ErrorTest(luaL_loadfile(L, PChar(FLibFile)))
     else
       exit;
+  }
   ErrorTest(lua_pcall(L, 0, NResults, 0));
 end;
 
@@ -380,6 +385,9 @@ begin
       lua_close(L);
     end;
   L := nil;
+
+  FLibFile:='';
+  FScript:='';
 end;
 
 procedure TLUA.Open;

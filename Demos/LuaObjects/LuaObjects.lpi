@@ -2,12 +2,14 @@
 <CONFIG>
   <ProjectOptions>
     <PathDelim Value="\"/>
-    <Version Value="5"/>
+    <Version Value="7"/>
     <General>
+      <Flags>
+        <LRSInOutputDirectory Value="False"/>
+      </Flags>
       <MainUnit Value="0"/>
-      <IconPath Value="./"/>
       <TargetFileExt Value=".exe"/>
-      <ActiveEditorIndexAtStart Value="0"/>
+      <ActiveEditorIndexAtStart Value="1"/>
     </General>
     <VersionInfo>
       <ProjectVersion Value=""/>
@@ -23,7 +25,7 @@
     <RunParams>
       <local>
         <FormatVersion Value="1"/>
-        <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
+        <LaunchingApplication PathPlusParams="\usr\X11R6\bin\xterm -T 'Lazarus Run Output' -e $(LazarusDir)\tools\runwait.sh $(TargetCmdLine)"/>
       </local>
     </RunParams>
     <RequiredPackages Count="1">
@@ -42,12 +44,12 @@
       </Unit0>
       <Unit1>
         <Filename Value="forms\MainForm.pas"/>
-        <ComponentName Value="frmMain"/>
         <IsPartOfProject Value="True"/>
-        <ResourceFilename Value="forms\MainForm.lrs"/>
+        <ComponentName Value="frmMain"/>
+        <ResourceBaseClass Value="Form"/>
         <UnitName Value="MainForm"/>
-        <CursorPos X="43" Y="47"/>
-        <TopLine Value="35"/>
+        <CursorPos X="14" Y="31"/>
+        <TopLine Value="1"/>
         <EditorIndex Value="0"/>
         <UsageCount Value="22"/>
         <Loaded Value="True"/>
@@ -55,9 +57,9 @@
       <Unit2>
         <Filename Value="..\..\LuaObject.pas"/>
         <UnitName Value="LuaObject"/>
-        <CursorPos X="42" Y="108"/>
-        <TopLine Value="88"/>
-        <EditorIndex Value="6"/>
+        <CursorPos X="11" Y="59"/>
+        <TopLine Value="41"/>
+        <EditorIndex Value="2"/>
         <UsageCount Value="11"/>
         <Loaded Value="True"/>
       </Unit2>
@@ -66,7 +68,7 @@
         <UnitName Value="pLuaObject"/>
         <CursorPos X="1" Y="465"/>
         <TopLine Value="457"/>
-        <EditorIndex Value="7"/>
+        <EditorIndex Value="3"/>
         <UsageCount Value="11"/>
         <Loaded Value="True"/>
       </Unit3>
@@ -75,7 +77,7 @@
         <UnitName Value="pLua"/>
         <CursorPos X="1" Y="130"/>
         <TopLine Value="104"/>
-        <EditorIndex Value="8"/>
+        <EditorIndex Value="4"/>
         <UsageCount Value="11"/>
         <Loaded Value="True"/>
       </Unit4>
@@ -83,8 +85,8 @@
         <Filename Value="lib\LuaButton.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="LuaButton"/>
-        <CursorPos X="25" Y="81"/>
-        <TopLine Value="1"/>
+        <CursorPos X="5" Y="22"/>
+        <TopLine Value="5"/>
         <EditorIndex Value="1"/>
         <UsageCount Value="22"/>
         <Bookmarks Count="1">
@@ -97,49 +99,47 @@
         <UnitName Value="Buttons"/>
         <CursorPos X="16" Y="65"/>
         <TopLine Value="44"/>
-        <EditorIndex Value="2"/>
         <UsageCount Value="11"/>
-        <Loaded Value="True"/>
       </Unit6>
       <Unit7>
         <Filename Value="..\..\..\..\..\lcl\stdctrls.pp"/>
         <UnitName Value="StdCtrls"/>
         <CursorPos X="19" Y="1053"/>
         <TopLine Value="1032"/>
-        <EditorIndex Value="3"/>
         <UsageCount Value="11"/>
-        <Loaded Value="True"/>
       </Unit7>
       <Unit8>
         <Filename Value="..\..\..\..\..\lcl\controls.pp"/>
         <UnitName Value="Controls"/>
         <CursorPos X="27" Y="1268"/>
         <TopLine Value="1247"/>
-        <EditorIndex Value="4"/>
         <UsageCount Value="11"/>
-        <Loaded Value="True"/>
       </Unit8>
       <Unit9>
         <Filename Value="..\..\..\..\..\fpc\2.1.5\source\rtl\objpas\classes\classesh.inc"/>
         <CursorPos X="55" Y="110"/>
         <TopLine Value="89"/>
-        <EditorIndex Value="5"/>
         <UsageCount Value="11"/>
-        <Loaded Value="True"/>
       </Unit9>
     </Units>
-    <JumpHistory Count="0" HistoryIndex="-1"/>
+    <JumpHistory Count="2" HistoryIndex="1">
+      <Position1>
+        <Filename Value="forms\MainForm.pas"/>
+        <Caret Line="31" Column="14" TopLine="1"/>
+      </Position1>
+      <Position2>
+        <Filename Value="lib\LuaButton.pas"/>
+        <Caret Line="64" Column="11" TopLine="100"/>
+      </Position2>
+    </JumpHistory>
   </ProjectOptions>
   <CompilerOptions>
-    <Version Value="5"/>
+    <Version Value="8"/>
     <PathDelim Value="\"/>
     <SearchPaths>
       <OtherUnitFiles Value="forms\;lib\;..\..\"/>
       <UnitOutputDirectory Value="bin"/>
     </SearchPaths>
-    <CodeGeneration>
-      <Generate Value="Faster"/>
-    </CodeGeneration>
     <Linking>
       <Options>
         <Win32>
@@ -152,7 +152,7 @@
     </Other>
   </CompilerOptions>
   <Debugging>
-    <BreakPoints Count="2">
+    <BreakPoints Count="3">
       <Item1>
         <Source Value="..\..\pLuaObject.pas"/>
         <Line Value="126"/>
@@ -161,6 +161,10 @@
         <Source Value="..\Turtle\lib\Turtle.pas"/>
         <Line Value="117"/>
       </Item2>
+      <Item3>
+        <Source Value="lib\LuaButton.pas"/>
+        <Line Value="126"/>
+      </Item3>
     </BreakPoints>
     <Watches Count="6">
       <Item1>
