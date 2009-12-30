@@ -171,7 +171,8 @@ begin
   if L = nil then
     Open;
 
-  if lua_gettop(l) <= 0 then
+  if (lua_gettop(l) <= 0) or
+     (lua_type(L,-1) <> LUA_TFUNCTION) then
      raise Exception.Create('No script is loaded at stack');
   {--
   if FScript <> '' then
@@ -216,7 +217,7 @@ begin
   if L= nil then
     Open;
   ErrorTest(luaL_loadbuffer(L, PChar(Script), Length(Script), PChar(LibName)));
-  ErrorTest(lua_pcall(L, 0, 0, 0));
+  ExecuteScript(0);
 end;
 
 procedure TLUA.ExecuteFile(FileName: AnsiString);
@@ -239,7 +240,7 @@ begin
     sl.Free;
   end;
   ErrorTest(luaL_loadbuffer(L, PChar(Script), Length(Script), PChar(LibName)));   }
-  ErrorTest(lua_pcall(L, 0, 0, 0));
+  ExecuteScript(0);
 end;
 
 procedure TLUA.SetLuaPath(const AValue: AnsiString);
@@ -261,7 +262,7 @@ begin
   try
     FLibFile := FileName;
     FScript := '';
-    luaL_loadfile(L, PChar(FileName));
+    ErrorTest( luaL_loadfile(L, PChar(FileName)) );
   finally
     plua_CheckStackBalance(l, StartTop+1);
   end;
