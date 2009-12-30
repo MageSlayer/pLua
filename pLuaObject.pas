@@ -564,13 +564,16 @@ end;
 
 procedure plua_releaseClassInfo(var ClassInfoPointer: PLuaClassInfo);
 begin
-  ClassInfoPointer^.PropHandlers.Free;
+  plua_releaseClassInfo( ClassInfoPointer^ );
+
   Freemem(ClassInfoPointer);
   ClassInfoPointer:=nil;
 end;
 
 procedure plua_releaseClassInfo(var ClassInfoPointer: TLuaClassInfo);
 begin
+  Finalize(ClassInfoPointer.Properties);
+
   ClassInfoPointer.PropHandlers.Free;
   ClassInfoPointer.PropHandlers:=nil;
 end;
