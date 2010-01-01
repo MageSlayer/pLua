@@ -899,8 +899,8 @@ begin
   if idx > -1 then
     begin
       ci := ClassInfo[idx];
+      plua_releaseClassInfo(ci);
       fItems.Delete(idx);
-      Freemem(ci);
     end;
 end;
 
@@ -925,8 +925,8 @@ begin
   while count > 0 do
     begin
       ci := ClassInfo[count-1];
+      plua_releaseClassInfo(ci);
       fItems.Delete(count-1);
-      Freemem(ci);
     end;
 end;
 
@@ -1074,12 +1074,9 @@ finalization
       Freemem(instance);
     end;
 
-  LuaObjects.Free;
-  LuaObjects := nil;
-  ClassTypesList.Free;
-  LuaClasses.Free;
-  LuaClasses := nil;
-  LuaDelegates.Free;
-  LuaDelegates := nil;
+  FreeAndNil(LuaObjects);
+  FreeAndNil(ClassTypesList);
+  FreeAndNil(LuaClasses);
+  FreeAndNil(LuaDelegates);
 
 end.
