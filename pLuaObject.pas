@@ -118,7 +118,7 @@ type
     property Count : Integer read GetCount;
   end;
 
-procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer);
+procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer; TypeOnTop:integer = LUA_TNONE);
 procedure plua_registerclass( l : PLua_State; classInfo : TLuaClassInfo);
 procedure plua_newClassInfo( var ClassInfoPointer : PLuaClassInfo);
 procedure plua_initClassInfo( var ClassInfo : TLuaClassInfo);
@@ -333,10 +333,7 @@ begin
     instance^.obj := TObject.Create;
   LuaObjects_Add(pointer(instance));
 
-  lua_newtable(L);
   instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
-  lua_rawgeti(l, LUA_REGISTRYINDEX, instance^.LuaRef);
-  oidx := lua_gettop(L);
 
   obj_user:=lua_newuserdata(L, sizeof(PObject));
   obj_user^:=TObject(instance);
@@ -494,12 +491,16 @@ begin
 end;
 *)
 
-procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer);
+procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer; TypeOnTop:integer = LUA_TNONE);
 var CurStack:Integer;
 begin
   CurStack:=lua_gettop(l);
   if CurStack <> TopToBe then
     raise Exception.CreateFmt('Lua stack is unbalanced. %d, should be %d', [CurStack, TopToBe]);
+
+  if (TypeOnTop <> LUA_TNONE) and
+     (lua_type(l, -1) <> TypeOnTop) then
+     raise Exception.Create('Wrong type pushed');
 end;
 
 procedure plua_registerclass(l: PLua_State; classInfo: TLuaClassInfo);
@@ -508,36 +509,34 @@ begin
   Log('Registering class %s.', [classInfo.ClassName]);
 
   StartTop := lua_gettop(l);
-  try
-    //skip re-registering classes.
-    if LuaClasses.IndexOf( classinfo.ClassName ) <> -1 then Exit;
 
-    {lidx := }LuaClasses.Add(classInfo);
+  //skip re-registering classes.
+  if LuaClasses.IndexOf( classinfo.ClassName ) <> -1 then Exit;
 
-    plua_pushstring(l, classInfo.ClassName);
-    lua_newtable(l);
+  {lidx := }LuaClasses.Add(classInfo);
 
-    if luaL_newmetatable(l, PChar(classInfo.ClassName+'_mt')) <> 1 then
-      raise Exception.Create('Cannot create metatable');
+  plua_pushstring(l, classInfo.ClassName);
+  lua_newtable(l);
 
-    lua_setmetatable(l, -2);
-    lua_settable(l, LUA_GLOBALSINDEX);
+  if luaL_newmetatable(l, PChar(classInfo.ClassName+'_mt')) <> 1 then
+    raise Exception.Create('Cannot create metatable');
 
-    luaL_getmetatable(l, PChar(classInfo.ClassName+'_mt'));
-    midx := lua_gettop(l);
+  lua_setmetatable(l, -2);
+  lua_settable(l, LUA_GLOBALSINDEX);
 
-    lua_pushstring(L, '__call');
-    lua_pushcfunction(L, @plua_new_class);
-    lua_rawset(L, midx);
-    lua_pushstring(L, '__gc');
-    lua_pushcfunction(L, @plua_gc_class);
-    lua_rawset(L, midx);
+  luaL_getmetatable(l, PChar(classInfo.ClassName+'_mt'));
+  midx := lua_gettop(l);
 
-    lua_pop(l, 1);
+  lua_pushstring(L, '__call');
+  lua_pushcfunction(L, @plua_new_class);
+  lua_rawset(L, midx);
+  lua_pushstring(L, '__gc');
+  lua_pushcfunction(L, @plua_gc_class);
+  lua_rawset(L, midx);
 
-  finally
-    plua_CheckStackBalance(l, StartTop);
-  end;
+  lua_pop(l, 1);
+
+  plua_CheckStackBalance(l, StartTop);
 
   Log('Registering - done.');
 end;
@@ -672,6 +671,9 @@ begin
   obj_user:=lua_newuserdata(L, sizeof(PObject));
   obj_user^:=TObject(instance);
 
+  instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
+  lua_rawgeti(instance^.l, LUA_REGISTRYINDEX, instance^.LuaRef);
+
   luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
   lua_setmetatable(l, -2);
 
@@ -689,38 +691,40 @@ var
   obj_user: PObject;
 begin
   StartTop:=lua_gettop(l);
-  try
-    instance := plua_GetObjectInfo(l, ObjectInstance);
-    if assigned(instance) then
-      begin
-        plua_PushObject(instance);
-        exit;
-      end;
 
-    {$IFDEF DEBUG_LUA}
-    Log('plua_pushexisting. Object $%x', [PtrInt(ObjectInstance)]);
-    {$ENDIF}
+  instance := plua_GetObjectInfo(l, ObjectInstance);
+  if assigned(instance) then
+    begin
+      plua_PushObject(instance);
+      exit;
+    end;
 
-    cInfo := classInfo;
+  {$IFDEF DEBUG_LUA}
+  Log('plua_pushexisting. Object $%x', [PtrInt(ObjectInstance)]);
+  {$ENDIF}
 
-    new(instance);
-    result := instance;
-    instance^.OwnsObject := FreeOnGC;
-    instance^.ClassInfo := cInfo;
-    instance^.l := l;
-    instance^.obj := ObjectInstance;
-    instance^.Delegate := nil;
+  cInfo := classInfo;
 
-    LuaObjects_Add(pointer(instance));
+  new(instance);
+  result := instance;
+  instance^.OwnsObject := FreeOnGC;
+  instance^.ClassInfo := cInfo;
+  instance^.l := l;
+  instance^.obj := ObjectInstance;
+  instance^.Delegate := nil;
 
-    obj_user:=lua_newuserdata(L, sizeof(PObject));
-    obj_user^:=TObject(instance);
+  LuaObjects_Add(pointer(instance));
 
-    luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
-    lua_setmetatable(l, -2);
-  finally
-    plua_CheckStackBalance(l, StartTop + 1);
-  end;
+  obj_user:=lua_newuserdata(L, sizeof(PObject));
+  obj_user^:=TObject(instance);
+
+  instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
+  lua_rawgeti(instance^.l, LUA_REGISTRYINDEX, instance^.LuaRef);
+
+  luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
+  lua_setmetatable(l, -2);
+
+  plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
 end;
 
 function plua_PushObject(ObjectInfo: PLuaInstanceInfo) : Boolean;

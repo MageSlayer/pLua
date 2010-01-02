@@ -58,10 +58,18 @@ type
     procedure Open;
     procedure GarbageCollect;
 
-    procedure LoadScript(Script : AnsiString);
-    procedure LoadFile(FileName:AnsiString);
+    procedure LoadScript(const Script : AnsiString);
+    procedure LoadFile(const FileName:AnsiString);
+
+    //Loads function and saves it in lua state under given name.
+    //It's purpose is to run it multiple times without reloading.
+    procedure LoadFunctionFromFile(const FileName:string; const FunctionSaveAs:string);
+    procedure LoadFunctionFromScript(const Script:string; const FunctionSaveAs:string);
+
     procedure Execute;
-    function  ExecuteAsFunctionObj:TObject;
+
+    function  ExecuteAsFunctionObj(const FunctionName:string):TObject;
+
     procedure ExecuteCmd(Script:AnsiString);
     procedure ExecuteFile(FileName : AnsiString);
     procedure RegisterLuaMethod(aMethodName: AnsiString; Func: lua_CFunction);
@@ -174,15 +182,7 @@ begin
   if (lua_gettop(l) <= 0) or
      (lua_type(L,-1) <> LUA_TFUNCTION) then
      raise Exception.Create('No script is loaded at stack');
-  {--
-  if FScript <> '' then
-    ErrorTest(luaL_loadbuffer(L, PChar(FScript), length(FScript), PChar(LibName)))
-  else
-    if FLibFile <> '' then
-      ErrorTest(luaL_loadfile(L, PChar(FLibFile)))
-    else
-      exit;
-  }
+
   ErrorTest(lua_pcall(L, 0, NResults, 0));
 end;
 
@@ -191,25 +191,27 @@ begin
   ExecuteScript(0);
 end;
 
-function TLUA.ExecuteAsFunctionObj: TObject;
+function TLUA.ExecuteAsFunctionObj(const FunctionName:string): TObject;
 var tix:Integer;
     StartTop:integer;
 begin
   Result:=nil;
   StartTop:=lua_gettop(l);
-  try
-    ExecuteScript(LUA_MULTRET);
-    tix:=lua_gettop(l);
-    if tix > 0 then
-      begin
-        if lua_type(L,-1) = LUA_TUSERDATA then
-          Result:=plua_getObject(l, tix)
-          else
-          lua_pop(l, 1);
-      end;
-  finally
-    plua_CheckStackBalance(l, StartTop);
-  end;
+
+  //load function with name FunctionName on stack
+  lua_getglobal(l, PChar(FunctionName));
+
+  ExecuteScript(LUA_MULTRET);
+  tix:=lua_gettop(l);
+  if tix > 0 then
+    begin
+      if lua_type(L,-1) = LUA_TUSERDATA then
+        Result:=plua_getObject(l, tix)
+        else
+        lua_pop(l, 1);
+    end;
+
+  plua_CheckStackBalance(l, StartTop);
 end;
 
 procedure TLUA.ExecuteCmd(Script: AnsiString);
@@ -229,17 +231,6 @@ begin
     Open;
 
   ErrorTest(luaL_loadfile(L, PChar(FileName)));
-{
-  if L = nil then
-    Open;
-  sl := TStringList.Create;
-  try
-    sl.LoadFromFile(FileName);
-    Script := sl.Text;
-  finally
-    sl.Free;
-  end;
-  ErrorTest(luaL_loadbuffer(L, PChar(Script), Length(Script), PChar(LibName)));   }
   ExecuteScript(0);
 end;
 
@@ -252,23 +243,45 @@ begin
   lua_settable(L, -3);
 end;
 
-procedure TLUA.LoadFile(FileName: AnsiString);
+procedure TLUA.LoadFile(const FileName: AnsiString);
 var StartTop:integer;
 begin
   if L = nil then
     Open;
 
   StartTop:=lua_gettop(l);
-  try
-    FLibFile := FileName;
-    FScript := '';
-    ErrorTest( luaL_loadfile(L, PChar(FileName)) );
-  finally
-    plua_CheckStackBalance(l, StartTop+1);
-  end;
+
+  FLibFile := FileName;
+  FScript := '';
+  ErrorTest( luaL_loadfile(L, PChar(FileName)) );
+
+  plua_CheckStackBalance(l, StartTop+1);
 end;
 
-procedure TLUA.LoadScript(Script: AnsiString);
+procedure TLUA.LoadFunctionFromFile(const FileName: string; const FunctionSaveAs:string);
+var StartTop:integer;
+begin
+  StartTop:=lua_gettop(l);
+
+  LoadFile(FileName);
+  lua_setglobal(L, PChar(FunctionSaveAs));
+
+  plua_CheckStackBalance(l, StartTop);
+end;
+
+procedure TLUA.LoadFunctionFromScript(const Script: string;
+  const FunctionSaveAs: string);
+var StartTop:integer;
+begin
+  StartTop:=lua_gettop(l);
+
+  LoadScript(Script);
+  lua_setglobal(L, PChar(FunctionSaveAs));
+
+  plua_CheckStackBalance(l, StartTop);
+end;
+
+procedure TLUA.LoadScript(const Script: AnsiString);
 var StartTop:integer;
 begin
   if FScript <> Script then
@@ -278,14 +291,13 @@ begin
     Open;
 
   StartTop:=lua_gettop(l);
-  try
-    FScript := Trim(Script);
-    FLibFile := '';
-    if FScript <> '' then
-      luaL_loadbuffer(L, PChar(Script), length(Script), PChar(LibName));
-  finally
-    plua_CheckStackBalance(l, StartTop);
-  end;
+
+  FScript := Trim(Script);
+  FLibFile := '';
+  if FScript <> '' then
+    luaL_loadbuffer(L, PChar(Script), length(Script), PChar(LibName));
+
+  plua_CheckStackBalance(l, StartTop);
 end;
 
 function TLUA.FunctionExists(aMethodName: AnsiString): Boolean;
@@ -340,18 +352,17 @@ function TLUA.GetValue(valName : AnsiString): Variant;
 var StartTop:Integer;
 begin
   StartTop:=lua_gettop(l);
+
+  result := NULL;
+  lua_pushstring(l, PChar(valName));
+  lua_rawget(l, LUA_GLOBALSINDEX);
   try
-    result := NULL;
-    lua_pushstring(l, PChar(valName));
-    lua_rawget(l, LUA_GLOBALSINDEX);
-    try
-      result := plua_tovariant(l, -1);
-    finally
-      lua_pop(l, 1);
-    end;
+    result := plua_tovariant(l, -1);
   finally
-    plua_CheckStackBalance(l, StartTop);
+    lua_pop(l, 1);
   end;
+
+  plua_CheckStackBalance(l, StartTop);
 end;
 
 function TLUA.GetLuaCPath: AnsiString;
@@ -476,22 +487,21 @@ procedure TLUA.SetValue(valName : AnsiString; const AValue: Variant);
 var StartTop:Integer;
 begin
   StartTop:=lua_gettop(l);
-  try
-    if VarIsType(AValue, varString) then
-      begin
-        lua_pushliteral(l, PChar(valName));
-        lua_pushstring(l, PChar(AnsiString(AValue)));
-        lua_settable(L, LUA_GLOBALSINDEX);
-      end
-    else
-      begin
-        lua_pushliteral(l, PChar(valName));
-        plua_pushvariant(l, AValue);
-        lua_settable(L, LUA_GLOBALSINDEX);
-      end;
-  finally
-    plua_CheckStackBalance(l, StartTop);
-  end;
+
+  if VarIsType(AValue, varString) then
+    begin
+      lua_pushliteral(l, PChar(valName));
+      lua_pushstring(l, PChar(AnsiString(AValue)));
+      lua_settable(L, LUA_GLOBALSINDEX);
+    end
+  else
+    begin
+      lua_pushliteral(l, PChar(valName));
+      plua_pushvariant(l, AValue);
+      lua_settable(L, LUA_GLOBALSINDEX);
+    end;
+
+  plua_CheckStackBalance(l, StartTop);
 end;
 
 function TLUA.CallTableFunction(TableName, FunctionName: AnsiString;
@@ -519,21 +529,28 @@ var n, tix:integer;
     StartTop:integer;
 begin
   StartTop:=lua_gettop(l);
-  try
-    lua_newtable(L); // table
-    tix:=lua_gettop(l);
 
-    for n:=0 to High(A) do
-      begin
-        lua_pushinteger(L, n+1); // table,key
-        pLuaObject.plua_pushexisting(l, A[n], C, FreeGC);
-        //lua_settable(L,-3); // table
-        lua_settable(L,tix); // table
-      end;
-    lua_setglobal( L, PChar(varName) );
-  finally
-    plua_CheckStackBalance(l, StartTop);
-  end;
+  {
+  //if global var already exists ...
+  lua_getglobal(L, PChar(varName) );
+  if not lua_isnil(L, -1) then
+    begin
+      // ... remove it
+      lua_pushnil( L );
+      lua_setglobal( L, PChar(varName) );
+    end;
+  lua_pop(L, -1); //balance stack
+  }
+  lua_newtable(L); // table
+  for n:=0 to High(A) do
+    begin
+      lua_pushinteger(L, n+1); // table,key
+      pLuaObject.plua_pushexisting(l, A[n], C, FreeGC);
+      lua_settable(L,-3); // table
+    end;
+  lua_setglobal( L, PChar(varName) );
+
+  plua_CheckStackBalance(l, StartTop);
 end;
 
 function TLUA.ObjGet(const varName: string): TObject;
