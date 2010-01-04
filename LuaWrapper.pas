@@ -56,6 +56,9 @@ type
 
     procedure Close;
     procedure Open;
+
+    //mark given object as being ready for garbage collection
+    procedure ObjMarkFree(Obj:TObject);
     procedure GarbageCollect;
 
     procedure LoadScript(const Script : AnsiString);
@@ -408,6 +411,12 @@ begin
     Close;
   L := lua_open;
   OpenLibs;
+end;
+
+procedure TLUA.ObjMarkFree(Obj: TObject);
+begin
+  if l <> nil then
+    plua_ObjectMarkFree(l, Obj);
 end;
 
 procedure TLUA.GarbageCollect;

@@ -145,6 +145,7 @@ function plua_pushexisting( l : PLua_State;
                             ObjectInstance : TObject;
                             classInfo : PLuaClassInfo;
                             FreeOnGC : Boolean = false) : PLuaInstanceInfo;
+procedure plua_ObjectMarkFree( l: Plua_State; ObjectInstance:TObject );
 
 function  plua_PushObject(ObjectInfo : PLuaInstanceInfo) : Boolean;
 function  plua_GetObjectInfo(l : Plua_State; InstanceObject : TObject) : PLuaInstanceInfo;
@@ -687,6 +688,17 @@ begin
   lua_setmetatable(l, -2);
 
   plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
+end;
+
+procedure plua_ObjectMarkFree(l: Plua_State; ObjectInstance: TObject);
+var objinfo:PLuaInstanceInfo;
+begin
+  objinfo := plua_GetObjectInfo(l, ObjectInstance);
+  if objinfo = nil then
+     raise LuaException.CreateFmt('Object $%x does not have object info', [PtrInt(ObjectInstance)]);
+
+  //remove reference
+  luaL_unref(L, LUA_REGISTRYINDEX, objinfo^.LuaRef);
 end;
 
 function plua_PushObject(ObjectInfo: PLuaInstanceInfo) : Boolean;
