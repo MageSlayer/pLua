@@ -635,47 +635,9 @@ end;
 function plua_registerExisting(l: PLua_State; InstanceName: AnsiString;
   ObjectInstance: TObject; classInfo: PLuaClassInfo;
   FreeOnGC : Boolean = false) : PLuaInstanceInfo;
-var
-  i, n, tidx, midx, classID,
-  oidx    : Integer;
-  classPTR: Pointer;
-  cInfo   : PLuaClassInfo;
-  instance: PLuaInstanceInfo;
-  obj_user: PObject;
 begin
-  instance := plua_GetObjectInfo(l, ObjectInstance);
-  if assigned(instance) then
-    begin
-      plua_pushstring(l, InstanceName);
-      plua_PushObject(instance);
-      lua_settable(l, LUA_GLOBALSINDEX);
-      exit;
-    end;
-
-  {$IFDEF DEBUG_LUA}
-  Log('plua_registerExisting. Object $%x', [PtrInt(ObjectInstance)]);
-  {$ENDIF}
-
-  cInfo := classInfo;
-
-  new(instance);
-  result := instance;
-  instance^.OwnsObject := FreeOnGC;
-  instance^.ClassInfo := cInfo;
-  instance^.l := l;
-  instance^.obj := ObjectInstance;
-  instance^.Delegate:=nil;
-
-  LuaObjects_Add(pointer(instance));
-
-  obj_user:=lua_newuserdata(L, sizeof(PObject));
-  obj_user^:=TObject(instance);
-
-  instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
-  lua_rawgeti(instance^.l, LUA_REGISTRYINDEX, instance^.LuaRef);
-
-  luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
-  lua_setmetatable(l, -2);
+  plua_pushstring(l, InstanceName);
+  Result:=plua_pushexisting(l, ObjectInstance, classInfo, FreeOnGC);
 
   lua_settable(l, LUA_GLOBALSINDEX );
 end;
@@ -692,10 +654,10 @@ var
 begin
   StartTop:=lua_gettop(l);
 
-  instance := plua_GetObjectInfo(l, ObjectInstance);
-  if assigned(instance) then
+  Result := plua_GetObjectInfo(l, ObjectInstance);
+  if assigned(Result) then
     begin
-      plua_PushObject(instance);
+      plua_PushObject(Result);
       exit;
     end;
 
