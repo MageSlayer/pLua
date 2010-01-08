@@ -185,16 +185,33 @@ begin
     LogFunction( Text );
 end;
 
+procedure LogFmt(const TextFmt:string; Args:array of const);
+begin
+  Log( Format(TextFmt, Args) );
+end;
+
+procedure Log(const TextFmt:string; Args:array of const);
+begin
+  LogFmt( TextFmt, Args );
+end;
+
 procedure DumpStackTrace;
 begin
   if @DumpStackTraceFunction <> nil then
     DumpStackTraceFunction;
 end;
 
-procedure Log(const TextFmt:string; Args:array of const);
+procedure LogDebug(const TextFmt:string; Args:array of const);
 begin
   {$IFDEF DEBUG_LUA}
-  Log( Format(TextFmt, Args) );
+  LogFmt( TextFmt, Args );
+  {$ENDIF}
+end;
+
+procedure LogDebug(const Text:string);
+begin
+  {$IFDEF DEBUG_LUA}
+  Log( Text );
   {$ENDIF}
 end;
 
@@ -507,7 +524,7 @@ end;
 procedure plua_registerclass(l: PLua_State; classInfo: TLuaClassInfo);
 var midx, StartTop : integer;
 begin
-  Log('Registering class %s.', [classInfo.ClassName]);
+  LogDebug('Registering class %s.', [classInfo.ClassName]);
 
   StartTop := lua_gettop(l);
 
@@ -539,7 +556,7 @@ begin
 
   plua_CheckStackBalance(l, StartTop);
 
-  Log('Registering - done.');
+  LogDebug('Registering - done.');
 end;
 
 procedure plua_newClassInfo(var ClassInfoPointer: PLuaClassInfo);
@@ -659,34 +676,32 @@ begin
   if assigned(Result) then
     begin
       plua_PushObject(Result);
-      exit;
+    end
+    else
+    begin
+      LogDebug('plua_pushexisting. Object $%x', [PtrInt(ObjectInstance)]);
+
+      cInfo := classInfo;
+
+      new(instance);
+      result := instance;
+      instance^.OwnsObject := FreeOnGC;
+      instance^.ClassInfo := cInfo;
+      instance^.l := l;
+      instance^.obj := ObjectInstance;
+      instance^.Delegate := nil;
+
+      LuaObjects_Add(pointer(instance));
+
+      obj_user:=lua_newuserdata(L, sizeof(PObject));
+      obj_user^:=TObject(instance);
+
+      instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
+      lua_rawgeti(instance^.l, LUA_REGISTRYINDEX, instance^.LuaRef);
+
+      luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
+      lua_setmetatable(l, -2);
     end;
-
-  {$IFDEF DEBUG_LUA}
-  Log('plua_pushexisting. Object $%x', [PtrInt(ObjectInstance)]);
-  {$ENDIF}
-
-  cInfo := classInfo;
-
-  new(instance);
-  result := instance;
-  instance^.OwnsObject := FreeOnGC;
-  instance^.ClassInfo := cInfo;
-  instance^.l := l;
-  instance^.obj := ObjectInstance;
-  instance^.Delegate := nil;
-
-  LuaObjects_Add(pointer(instance));
-
-  obj_user:=lua_newuserdata(L, sizeof(PObject));
-  obj_user^:=TObject(instance);
-
-  instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
-  lua_rawgeti(instance^.l, LUA_REGISTRYINDEX, instance^.LuaRef);
-
-  luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
-  lua_setmetatable(l, -2);
-
   plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
 end;
 
@@ -699,6 +714,7 @@ begin
 
   //remove reference
   luaL_unref(L, LUA_REGISTRYINDEX, objinfo^.LuaRef);
+  objinfo^.LuaRef:=LUA_NOREF;
 end;
 
 function plua_PushObject(ObjectInfo: PLuaInstanceInfo) : Boolean;
