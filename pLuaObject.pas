@@ -340,9 +340,6 @@ begin
       Freemem(instance);
 
       LuaObjects.Delete(i);
-      {$IFDEF DEBUG_LUA}
-      DumpStackTrace;
-      {$ENDIF}
     end;
 end;
 
@@ -405,10 +402,9 @@ begin
   if assigned(d) then
     d.Free;
 
-  LuaObjects_Free(nfo);
-
   luaL_unref(L, LUA_REGISTRYINDEX, nfo^.LuaRef);
-  freemem(nfo);
+
+  LuaObjects_Free(nfo);
   result := 0;
 end;
 
@@ -807,7 +803,12 @@ begin
     begin
       nfo := PLuaInstanceInfo(LuaObjects[i]);
       if nfo^.l = l then
-        LuaObjects_Free( nfo );
+        begin
+          {$IFDEF DEBUG_LUA}
+          LogDebug('Lua object $%x (%s) memory leak. Freeing...', [ PtrInt(nfo^.obj), nfo^.obj.ClassName ]);
+          {$ENDIF}
+          LuaObjects_Free( nfo );
+        end;
       dec(i);
     end;
 end;
