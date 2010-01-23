@@ -119,7 +119,7 @@ type
   end;
 
 procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer; TypeOnTop:integer = LUA_TNONE);
-procedure plua_registerclass( l : PLua_State; classInfo : TLuaClassInfo);
+procedure plua_registerclass( l : PLua_State; const classInfo : TLuaClassInfo);
 procedure plua_newClassInfo( var ClassInfoPointer : PLuaClassInfo);
 procedure plua_initClassInfo( var ClassInfo : TLuaClassInfo);
 
@@ -213,6 +213,11 @@ begin
   {$IFDEF DEBUG_LUA}
   Log( Text );
   {$ENDIF}
+end;
+
+function ClassMetaTableName(cinfo:PLuaClassInfo):PChar;
+begin
+  Result:=PChar(cinfo^.ClassName+'_mt');
 end;
 
 function plua_gc_class(l : PLua_State) : integer; cdecl; forward;
@@ -381,7 +386,7 @@ begin
   obj_user:=lua_newuserdata(L, sizeof(PObject));
   obj_user^:=TObject(instance);
 
-  luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
+  luaL_getmetatable(l, ClassMetaTableName(cinfo) );
   lua_setmetatable(l, -2);
 
   result := 1;
@@ -542,7 +547,7 @@ begin
      raise Exception.Create('Wrong type pushed');
 end;
 
-procedure plua_registerclass(l: PLua_State; classInfo: TLuaClassInfo);
+procedure plua_registerclass(l: PLua_State; const classInfo: TLuaClassInfo);
 var midx, StartTop : integer;
 begin
   LogDebug('Registering class %s.', [classInfo.ClassName]);
@@ -557,13 +562,13 @@ begin
   plua_pushstring(l, classInfo.ClassName);
   lua_newtable(l);
 
-  if luaL_newmetatable(l, PChar(classInfo.ClassName+'_mt')) <> 1 then
+  if luaL_newmetatable(l, ClassMetaTableName(@classInfo) ) <> 1 then
     raise Exception.Create('Cannot create metatable');
 
   lua_setmetatable(l, -2);
   lua_settable(l, LUA_GLOBALSINDEX);
 
-  luaL_getmetatable(l, PChar(classInfo.ClassName+'_mt'));
+  luaL_getmetatable(l, ClassMetaTableName(@classInfo) );
   midx := lua_gettop(l);
 
   lua_pushstring(L, '__call');
@@ -720,7 +725,7 @@ begin
       instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
       lua_rawgeti(instance^.l, LUA_REGISTRYINDEX, instance^.LuaRef);
 
-      luaL_getmetatable(l, PChar(cinfo^.ClassName+'_mt'));
+      luaL_getmetatable(l, ClassMetaTableName(cinfo) );
       lua_setmetatable(l, -2);
     end;
   plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
