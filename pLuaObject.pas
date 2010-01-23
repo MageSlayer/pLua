@@ -220,6 +220,15 @@ begin
   Result:=PChar(cinfo^.ClassName+'_mt');
 end;
 
+procedure plua_ref_release(l : PLua_State; obj:PLuaInstanceInfo);
+begin
+  if obj^.LuaRef <> LUA_NOREF then
+    begin
+      luaL_unref(L, LUA_REGISTRYINDEX, obj^.LuaRef);
+      obj^.LuaRef:=LUA_NOREF;
+    end;
+end;
+
 function plua_gc_class(l : PLua_State) : integer; cdecl; forward;
 
 function plua_index_class(l : PLua_State) : integer; cdecl;
@@ -402,7 +411,7 @@ begin
   if assigned(d) then
     d.Free;
 
-  luaL_unref(L, LUA_REGISTRYINDEX, nfo^.LuaRef);
+  plua_ref_release(l, nfo);
 
   LuaObjects_Free(nfo);
   result := 0;
@@ -735,8 +744,7 @@ begin
      raise LuaException.CreateFmt('Object $%x does not have object info', [PtrInt(ObjectInstance)]);
 
   //remove reference
-  luaL_unref(L, LUA_REGISTRYINDEX, objinfo^.LuaRef);
-  objinfo^.LuaRef:=LUA_NOREF;
+  plua_ref_release(l, objinfo);
 end;
 
 function plua_PushObject(ObjectInfo: PLuaInstanceInfo) : Boolean;
