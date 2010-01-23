@@ -58,7 +58,9 @@ type
     procedure Open;
 
     //mark given object as being ready for garbage collection
-    procedure ObjMarkFree(Obj:TObject);
+    procedure ObjMarkFree(Obj:TObject);overload;
+    procedure ObjMarkFree(const Obj:TObjArray);overload;
+
     procedure GarbageCollect;
 
     procedure LoadScript(const Script : AnsiString);
@@ -88,7 +90,9 @@ type
 
     procedure ObjArraySet(const varName:String; const A:TObjArray; C: PLuaClassInfo; FreeGC:boolean = False);
     function  ObjGet(const varName:string):TObject;
+
     procedure GlobalObjClear;
+    procedure GlobalVarClear(const varName:string);
 
     property ScriptText: AnsiString read FScript write FScript;
     property ScriptFile: AnsiString read FLibFile write FLibFile;
@@ -395,7 +399,7 @@ procedure TLUA.Close;
 begin
   if L <> nil then
     begin
-      plua_ClearObjects(L);
+      plua_ClearObjects(L, True);
       plua_ClearRecords(L);
       lua_close(L);
     end;
@@ -417,6 +421,14 @@ procedure TLUA.ObjMarkFree(Obj: TObject);
 begin
   if l <> nil then
     plua_ObjectMarkFree(l, Obj);
+end;
+
+procedure TLUA.ObjMarkFree(const Obj: TObjArray);
+var n:integer;
+begin
+  if l <> nil then
+    for n:=0 to High(Obj) do
+      plua_ObjectMarkFree(l, Obj[n]);
 end;
 
 procedure TLUA.GarbageCollect;
@@ -581,7 +593,14 @@ end;
 
 procedure TLUA.GlobalObjClear;
 begin
-  plua_ClearObjects(l);
+  plua_ClearObjects(l, False);
+end;
+
+procedure TLUA.GlobalVarClear(const varName: string);
+begin
+  lua_pushstring(l, PChar(varName));
+  lua_pushnil(l);
+  lua_settable(L, LUA_GLOBALSINDEX);
 end;
 
 function TLUA.TableFunctionExists(TableName,

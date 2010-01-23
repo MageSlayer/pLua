@@ -158,7 +158,7 @@ function  plua_CallObjectEvent( ObjectInfo : PLuaInstanceInfo;
 
 function  plua_GetEventDeletage( Obj : TObject ) : TLuaObjectEventDelegate;
 
-procedure plua_ClearObjects(L : PLua_State);
+procedure plua_ClearObjects(L : PLua_State; LeakWarnings:boolean);
 
 var
   LuaClasses     : TLuaClassList;
@@ -736,6 +736,8 @@ begin
       instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
       lua_rawgeti(instance^.l, LUA_REGISTRYINDEX, instance^.LuaRef);
 
+      LogDebug('plua_pushexisting. Object $%x. LuaRef=%d', [ PtrInt(ObjectInstance), instance^.LuaRef ]);
+
       luaL_getmetatable(l, ClassMetaTableName(cinfo) );
       lua_setmetatable(l, -2);
     end;
@@ -807,7 +809,7 @@ begin
     end;
 end;
 
-procedure plua_ClearObjects(L: PLua_State);
+procedure plua_ClearObjects(L: PLua_State; LeakWarnings:boolean);
 var
   i   : Integer;
   nfo : PLuaInstanceInfo;
@@ -818,12 +820,16 @@ begin
       nfo := PLuaInstanceInfo(LuaObjects[i]);
       if nfo^.l = l then
         begin
-          {$IFDEF DEBUG_LUA}
-          if nfo^.LuaRef <> LUA_NOREF then
-             LogDebug('Lua object $%x (%s) has lua ref unfreed.', [ PtrInt(nfo^.obj), nfo^.obj.ClassName ]);
+          if LeakWarnings then
+            begin
+              if nfo^.LuaRef <> LUA_NOREF then
+                 LogDebug('Lua object $%x (%s) has lua ref (%d) unfreed.',
+                          [ PtrInt(nfo^.obj), nfo^.obj.ClassName, nfo^.LuaRef ]);
 
-          LogDebug('Lua object $%x (%s) memory leak. Freeing...', [ PtrInt(nfo^.obj), nfo^.obj.ClassName ]);
-          {$ENDIF}
+              LogDebug('Lua object $%x (%s) memory leak. Freeing...', [ PtrInt(nfo^.obj), nfo^.obj.ClassName ]);
+            end;
+
+          plua_ref_release( l, nfo );
           LuaObjects_Free( nfo );
         end;
       dec(i);
