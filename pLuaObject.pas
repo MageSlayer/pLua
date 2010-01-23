@@ -308,12 +308,37 @@ begin
     result := method(obj, l, 2, pcount);
 end;
 
-procedure LuaObjects_Add(instance:pointer);
+procedure LuaObjects_Add(instance:PLuaInstanceInfo);
 begin
-  LuaObjects.Add(pointer(instance));
+  LuaObjects.Add( instance );
   {$IFDEF DEBUG_LUA}
   DumpStackTrace;
   {$ENDIF}
+end;
+
+procedure LuaObjects_Free(instance:PLuaInstanceInfo);
+var i:integer;
+begin
+  i:=LuaObjects.IndexOf(instance);
+  if i <> -1 then
+    begin
+      if instance^.OwnsObject then
+        begin
+          if assigned(instance^.ClassInfo^.Release) then
+            instance^.ClassInfo^.Release(instance^.obj, nil)
+          else
+            instance^.obj.Free;
+        end;
+
+      if Instance^.Delegate <> nil then
+        Instance^.Delegate.Free;
+      Freemem(instance);
+
+      LuaObjects.Delete(i);
+      {$IFDEF DEBUG_LUA}
+      DumpStackTrace;
+      {$ENDIF}
+    end;
 end;
 
 function plua_new_class(l : PLua_State) : integer; cdecl;
@@ -349,7 +374,7 @@ begin
     instance^.obj := cInfo^.New(l, 2, pcount, instance)
   else
     instance^.obj := TObject.Create;
-  LuaObjects_Add(pointer(instance));
+  LuaObjects_Add( instance );
 
   instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
 
@@ -370,17 +395,13 @@ begin
   nfo := plua_getObjectInfo(l, 1);
   if not assigned(nfo) then
     exit;
-  LuaObjects.Remove(nfo);
+
   d := plua_GetEventDeletage(nfo^.obj);
   if assigned(d) then
     d.Free;
-  if nfo^.OwnsObject then
-    begin
-      if assigned(nfo^.ClassInfo^.Release) then
-        nfo^.ClassInfo^.Release(nfo^.obj, l)
-      else
-        nfo^.obj.Free;
-    end;
+
+  LuaObjects_Free(nfo);
+
   luaL_unref(L, LUA_REGISTRYINDEX, nfo^.LuaRef);
   freemem(nfo);
   result := 0;
@@ -691,7 +712,7 @@ begin
       instance^.obj := ObjectInstance;
       instance^.Delegate := nil;
 
-      LuaObjects_Add(pointer(instance));
+      LuaObjects_Add( instance );
 
       obj_user:=lua_newuserdata(L, sizeof(PObject));
       obj_user^:=TObject(instance);
@@ -781,7 +802,7 @@ begin
     begin
       nfo := PLuaInstanceInfo(LuaObjects[i]);
       if nfo^.l = l then
-        LuaObjects.Remove(nfo);
+        LuaObjects_Free( nfo );
       dec(i);
     end;
 end;
@@ -1055,17 +1076,7 @@ finalization
       instance := PLuaInstanceInfo(LuaObjects[LuaObjects.Count-1]);
       Log('Freeing class "%s" instance.', [instance^.obj.ClassName]);
 
-      LuaObjects.Delete(LuaObjects.Count-1);
-      if instance^.OwnsObject then
-        begin
-          if assigned(instance^.ClassInfo^.Release) then
-            instance^.ClassInfo^.Release(instance^.obj, nil)
-          else
-            instance^.obj.Free;
-        end;
-      if Instance^.Delegate <> nil then
-        Instance^.Delegate.Free;
-      Freemem(instance);
+      LuaObjects_Free( instance );
     end;
 
   FreeAndNil(LuaObjects);
