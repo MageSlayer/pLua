@@ -229,6 +229,13 @@ begin
     end;
 end;
 
+function plua_instance_new: PLuaInstanceInfo;
+begin
+  New(Result);
+  FillChar(Result^, Sizeof(Result^), 0);
+  Result^.LuaRef:=LUA_NOREF;
+end;
+
 function plua_gc_class(l : PLua_State) : integer; cdecl; forward;
 
 function plua_index_class(l : PLua_State) : integer; cdecl;
@@ -346,7 +353,7 @@ begin
 
       if Instance^.Delegate <> nil then
         Instance^.Delegate.Free;
-      Freemem(instance);
+      Dispose(instance);
 
       LuaObjects.Delete(i);
     end;
@@ -376,15 +383,15 @@ begin
   cInfo := PLuaClassInfo(classPTR);
   lua_pop(l, 1);
 
-  new(instance);
+  instance:=plua_instance_new;
   instance^.OwnsObject := true;
   instance^.ClassInfo := cInfo;
   instance^.l := l;
-  instance^.Delegate:=nil;
   if cInfo^.New <> nil then
     instance^.obj := cInfo^.New(l, 2, pcount, instance)
   else
     instance^.obj := TObject.Create;
+
   LuaObjects_Add( instance );
 
   instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
@@ -714,13 +721,12 @@ begin
 
       cInfo := classInfo;
 
-      new(instance);
+      instance:=plua_instance_new;
       result := instance;
       instance^.OwnsObject := FreeOnGC;
       instance^.ClassInfo := cInfo;
       instance^.l := l;
       instance^.obj := ObjectInstance;
-      instance^.Delegate := nil;
 
       LuaObjects_Add( instance );
 
@@ -813,6 +819,9 @@ begin
       if nfo^.l = l then
         begin
           {$IFDEF DEBUG_LUA}
+          if nfo^.LuaRef <> LUA_NOREF then
+             LogDebug('Lua object $%x (%s) has lua ref unfreed.', [ PtrInt(nfo^.obj), nfo^.obj.ClassName ]);
+
           LogDebug('Lua object $%x (%s) memory leak. Freeing...', [ PtrInt(nfo^.obj), nfo^.obj.ClassName ]);
           {$ENDIF}
           LuaObjects_Free( nfo );
