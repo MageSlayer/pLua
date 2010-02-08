@@ -18,8 +18,6 @@ uses
 type
   TLua = class;
 
-  TObjArray = array of TObject;
-
   TLuaOnException = procedure( Title: ansistring; Line: Integer; Msg: ansistring;
                                var handled : Boolean) {$IFDEF TLuaHandlersAsIsObjectType}of object{$ENDIF};
   TLuaOnLoadLibs  = procedure( LuaWrapper : TLua ) {$IFDEF TLuaHandlersAsIsObjectType}of object{$ENDIF};
@@ -74,6 +72,7 @@ type
     procedure Execute;
 
     function  ExecuteAsFunctionObj(const FunctionName:string):TObject;
+    function  ExecuteAsFunctionObjList(const FunctionName:string):TObjArray;
 
     procedure ExecuteCmd(Script:AnsiString);
     procedure ExecuteFile(FileName : AnsiString);
@@ -216,6 +215,42 @@ begin
         Result:=plua_getObject(l, tix)
         else
         lua_pop(l, 1);
+    end;
+
+  plua_CheckStackBalance(l, StartTop);
+end;
+
+function TLUA.ExecuteAsFunctionObjList(const FunctionName: string): TObjArray;
+var tix:Integer;
+    StartTop:integer;
+    O:TObject;
+begin
+  SetLength(Result,0);
+  StartTop:=lua_gettop(l);
+
+  //load function with name FunctionName on stack
+  lua_getglobal(l, PChar(FunctionName));
+
+  ExecuteScript(LUA_MULTRET);
+  tix:=lua_gettop(l);
+  if tix > 0 then
+    begin
+      case lua_type(L,-1) of
+        LUA_TUSERDATA:
+          begin
+            O:=plua_getObject(l, tix);
+            SetLength(Result, 1);
+            Result[0]:=O;
+          end;
+
+        LUA_TTABLE:
+          begin
+            Result:=plua_getObjectTable(l, tix);
+          end;
+
+        else
+          lua_pop(l, 1);
+      end;
     end;
 
   plua_CheckStackBalance(l, StartTop);

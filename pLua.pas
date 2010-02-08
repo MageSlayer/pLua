@@ -12,6 +12,8 @@ uses
 type
   TVariantArray =array of Variant;
   PVariantArray =^TVariantArray;
+  TObjArray = array of TObject;
+
   LuaException = class(Exception)
   end;
 

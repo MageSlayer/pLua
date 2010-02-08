@@ -135,6 +135,8 @@ procedure plua_AddClassMethod( var ClassInfo : TLuaClassInfo;
                                wrapper : plua_MethodWrapper );
 
 function plua_getObject( l : PLua_State; idx : Integer; PopValue:boolean = True) : TObject;
+function plua_getObjectTable( l : PLua_State; idx : Integer; PopValue:boolean = True) : TObjArray;
+
 function plua_getObjectInfo( l : PLua_State; idx : Integer) : PLuaInstanceInfo;
 
 function plua_registerExisting( l : PLua_State; InstanceName : AnsiString;
@@ -674,6 +676,46 @@ begin
     lua_pop(l, 1);
   if assigned(instance) and assigned(instance^.obj) then
     result := instance^.obj;
+end;
+
+function plua_getObjectTable(l: PLua_State; idx: Integer; PopValue: boolean
+  ): TObjArray;
+var
+  obj_user:PObject;
+  instance : PLuaInstanceInfo;
+  C:Integer;
+begin
+  SetLength(Result, 20);
+  C:=0;
+
+  //table traversal
+  //http://www.lua.org/manual/5.0/manual.html#3.5
+  // table is in the stack at index idx
+  lua_pushnil(L);  // first key
+  while (lua_next(L, idx) <> 0) do
+  begin
+    // key is at index -2 and value at index -1
+     obj_user:= lua_touserdata(L, -1);
+     if obj_user <> nil then
+       begin
+         instance := PLuaInstanceInfo(obj_user^);
+         if assigned(instance) and assigned(instance^.obj) then
+           begin
+             Inc(C);
+             if Length(Result) < C then
+                SetLength(Result, Length(Result)+20);
+
+             Result[C-1]:=instance^.obj;
+           end;
+       end;
+
+     lua_pop(L, 1);  // removes value; keeps key for next iteration
+  end;
+
+  SetLength(Result, C);
+
+  if PopValue then
+    lua_pop(l, 1);
 end;
 
 function plua_getObjectInfo(l: PLua_State; idx: Integer): PLuaInstanceInfo;
