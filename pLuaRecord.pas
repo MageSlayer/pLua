@@ -93,6 +93,7 @@ procedure plua_registerRecordType( l : PLua_State; RecordInfo : TLuaRecordInfo);
 procedure plua_newRecordInfo( var RecordInfoPointer : PLuaRecordInfo);
 procedure plua_initRecordInfo( var RecordInfo : TLuaRecordInfo);
 procedure plua_releaseRecordInfo( var RecordInfoPointer : PLuaRecordInfo);
+procedure plua_releaseRecordInfo( var RecordInfo : TLuaRecordInfo);
 
 function plua_registerExistingRecord( l : PLua_State; InstanceName : AnsiString;
                                       RecordPointer: Pointer;
@@ -325,10 +326,17 @@ begin
   SetLength(RecordInfo.Properties, 0);
 end;
 
+procedure plua_releaseRecordInfo(var RecordInfo: TLuaRecordInfo);
+begin
+  FreeAndNil( RecordInfo.PropHandlers );
+  Finalize( RecordInfo.Properties );
+end;
+
 procedure plua_releaseRecordInfo(var RecordInfoPointer: PLuaRecordInfo);
 begin
-  RecordInfoPointer^.PropHandlers.Free;
+  plua_releaseRecordInfo(RecordInfoPointer^);
   Freemem(RecordInfoPointer);
+  RecordInfoPointer:=nil;
 end;
 
 function plua_registerExistingRecord(l: PLua_State; InstanceName: AnsiString;

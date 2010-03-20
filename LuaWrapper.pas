@@ -88,6 +88,7 @@ type
                                Results : PVariantArray = nil):Integer;
 
     procedure ObjArraySet(const varName:String; const A:TObjArray; C: PLuaClassInfo; FreeGC:boolean = False);
+    procedure ObjSet(const varName:String; const O:TObject; C: PLuaClassInfo; FreeGC:boolean = False);
     function  ObjGet(const varName:string):TObject;
 
     procedure GlobalObjClear;
@@ -607,6 +608,13 @@ begin
   lua_setglobal( L, PChar(varName) );
 
   plua_CheckStackBalance(l, StartTop);
+end;
+
+procedure TLUA.ObjSet(const varName: String; const O: TObject;
+  C: PLuaClassInfo; FreeGC: boolean);
+begin
+  pLuaObject.plua_pushexisting(l, O, C, FreeGC);
+  lua_setglobal( L, PChar(varName) );
 end;
 
 function TLUA.ObjGet(const varName: string): TObject;
