@@ -89,12 +89,13 @@ type
     property Count : Integer read GetCount;
   end;
 
-procedure plua_registerRecordType( l : PLua_State; RecordInfo : TLuaRecordInfo);
+procedure plua_registerRecordType( l : PLua_State; const RecordInfo : TLuaRecordInfo);
 procedure plua_newRecordInfo( var RecordInfoPointer : PLuaRecordInfo);
 procedure plua_initRecordInfo( var RecordInfo : TLuaRecordInfo);
 procedure plua_releaseRecordInfo( var RecordInfoPointer : PLuaRecordInfo);
 procedure plua_releaseRecordInfo( var RecordInfo : TLuaRecordInfo);
 
+procedure plua_RecordMarkFree(l: Plua_State; RecordPointer: Pointer);
 function plua_registerExistingRecord( l : PLua_State; InstanceName : AnsiString;
                                       RecordPointer: Pointer;
                                       RecordInfo : PLuaRecordInfo;
@@ -128,6 +129,11 @@ implementation
 
 var
   intLuaRecords : TList;
+
+function RecordMetaTableName(cinfo:PLuaRecordInfo):PChar;
+begin
+  Result:=PChar(cinfo^.RecordName+'_mt');
+end;
 
 function plua_gc_record(l : PLua_State) : integer; cdecl; forward;
 
@@ -243,11 +249,33 @@ begin
   result := 1;
 end;
 
+function plua_getRecordInfoFromUserData(l: PLua_State; idx: Integer): PLuaRecordInstanceInfo;
+var obj_user:^PLuaRecordInstanceInfo;
+begin
+  result := nil;
+
+  obj_user:=lua_touserdata(l, plua_absindex(l, idx));
+  if obj_user <> nil then
+     Result:=PLuaRecordInstanceInfo(obj_user^);
+
+  lua_pop(l, 1);
+end;
+
+procedure plua_ref_release(l : PLua_State; obj:PLuaRecordInstanceInfo);
+begin
+  if obj^.LuaRef <> LUA_NOREF then
+    begin
+      luaL_unref(L, LUA_REGISTRYINDEX, obj^.LuaRef);
+      obj^.LuaRef:=LUA_NOREF;
+    end;
+end;
+
 function plua_gc_record(l : PLua_State) : integer; cdecl;
 var
   nfo : PLuaRecordInstanceInfo;
 begin
-  nfo := plua_GetRecordInfo(l, 1);
+  //nfo := plua_GetRecordInfo(l, 1);
+  nfo:=plua_getRecordInfoFromUserData(l, 1);
   if not assigned(nfo) then
     exit;
   intLuaRecords.Remove(nfo);
@@ -261,7 +289,7 @@ begin
   result := 0;
 end;
 
-procedure plua_registerRecordType(l: PLua_State; RecordInfo: TLuaRecordInfo);
+procedure plua_registerRecordType(l: PLua_State; const RecordInfo: TLuaRecordInfo);
 var
   lidx, tidx, midx, i : integer;
   ci   : PLuaRecordInfo;
@@ -339,6 +367,17 @@ begin
   RecordInfoPointer:=nil;
 end;
 
+procedure plua_RecordMarkFree(l: Plua_State; RecordPointer: Pointer);
+var objinfo:PLuaRecordInstanceInfo;
+begin
+  objinfo := plua_getRecordInfo(l, RecordPointer);
+  if objinfo = nil then
+     raise LuaException.CreateFmt('Object $%x does not have record info', [PtrUInt(RecordPointer)]);
+
+  //remove reference
+  plua_ref_release(l, objinfo);
+end;
+
 function plua_registerExistingRecord(l: PLua_State; InstanceName: AnsiString;
   RecordPointer: Pointer; RecordInfo: PLuaRecordInfo; FreeOnGC: Boolean
   ): PLuaRecordInstanceInfo;
@@ -394,6 +433,7 @@ var
   recPTR  : Pointer;
   rInfo   : PLuaRecordInfo;
   instance: PLuaRecordInstanceInfo;
+  obj_user: ^PLuaRecordInstanceInfo;
 begin
   instance := plua_GetRecordInfo(l, RecordPointer);
   if assigned(instance) then
@@ -414,17 +454,20 @@ begin
   intLuaRecords.Add(pointer(instance));
 
   lua_newtable(L);
-  instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
-  lua_rawgeti(l, LUA_REGISTRYINDEX, instance^.LuaRef);
   oidx := lua_gettop(L);
 
   lua_pushliteral(L, '__instance');
   lua_pushinteger(L, PtrInt(instance));
   lua_rawset(l, oidx);
 
-  lua_pushstring(L, 'release');
-  lua_pushcfunction(L, @plua_gc_record);
-  lua_rawset(L, oidx);
+  lua_pushliteral(L, '__instance2');
+  obj_user:=lua_newuserdata(L, sizeof(obj_user));
+  obj_user^:=instance;
+  Result^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
+  lua_rawgeti(l, LUA_REGISTRYINDEX, Result^.LuaRef);
+  luaL_getmetatable(l, PChar(rinfo^.RecordName+'_mt'){RecordMetaTableName(rinfo)});
+  lua_setmetatable(l, -2);
+  lua_rawset(l, oidx);
 
   luaL_getmetatable(l, PChar(rinfo^.RecordName+'_mt'));
   lua_setmetatable(l, -2);
@@ -474,7 +517,7 @@ end;
 
 function plua_GetRecordInfo(l : PLua_State; RecordPointer: Pointer): PLuaRecordInstanceInfo;
 begin
-  LuaRecords.GetInfo(l, RecordPointer);
+  Result:=LuaRecords.GetInfo(l, RecordPointer);
 end;
 
 procedure plua_PushRecordToTable(L: PLua_State; RecordPointer: Pointer;
