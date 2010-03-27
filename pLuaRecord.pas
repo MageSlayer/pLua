@@ -146,7 +146,6 @@ var
   rec      : pointer;
   rInfo    : PLuaRecordInstanceInfo;
   reader   : plua_RecordPropertyReader;
-  bReadOnly: Boolean;
   pcount   : Integer;
 begin
   result := 0;
@@ -204,7 +203,7 @@ end;
 
 function plua_new_record(l : PLua_State) : integer; cdecl;
 var
-  i, n, tidx, midx, recordID,
+  n, tidx,
   oidx    : Integer;
   recordPTR: Pointer;
   rInfo   : PLuarecordInfo;
@@ -293,7 +292,7 @@ end;
 
 procedure plua_registerRecordType(l: PLua_State; const RecordInfo: TLuaRecordInfo);
 var
-  lidx, tidx, midx, i : integer;
+  lidx, tidx, midx : integer;
   ci   : PLuaRecordInfo;
 begin
   lidx := LuaRecords.Add(RecordInfo);
@@ -384,7 +383,6 @@ function plua_registerExistingRecord(l: PLua_State; InstanceName: AnsiString;
   RecordPointer: Pointer; RecordInfo: PLuaRecordInfo; FreeOnGC: Boolean
   ): PLuaRecordInstanceInfo;
 var
-  i, n, tidx, midx, classID,
   oidx    : Integer;
   rInfo   : PLuaRecordInfo;
   instance: PLuaRecordInstanceInfo;
@@ -430,9 +428,7 @@ end;
 function plua_pushexisting(l: PLua_State; RecordPointer: Pointer;
   RecordInfo: PLuaRecordInfo; FreeOnGC: Boolean): PLuaRecordInstanceInfo;
 var
-  i, n, tidx, midx, classID,
   oidx    : Integer;
-  recPTR  : Pointer;
   rInfo   : PLuaRecordInfo;
   instance: PLuaRecordInstanceInfo;
   obj_user: ^PLuaRecordInstanceInfo;
