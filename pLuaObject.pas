@@ -217,18 +217,24 @@ begin
   {$ENDIF}
 end;
 
-function ClassMetaTableName(cinfo:PLuaClassInfo):PChar;
+function ClassMetaTableName(cinfo:PLuaClassInfo):string;
 begin
-  Result:=PChar(cinfo^.ClassName+'_mt');
+  //using PChar(cinfo^.ClassName+'_mt') gives various hard to trace bugs and memory leaks
+  Result:=cinfo^.ClassName+'_mt';
 end;
 
-procedure plua_ref_release(l : PLua_State; obj:PLuaInstanceInfo);
+procedure plua_ref_release(l : PLua_State; obj_ref:Integer);overload;
 begin
-  if obj^.LuaRef <> LUA_NOREF then
+  if obj_ref <> LUA_NOREF then
     begin
-      luaL_unref(L, LUA_REGISTRYINDEX, obj^.LuaRef);
-      obj^.LuaRef:=LUA_NOREF;
+      luaL_unref(L, LUA_REGISTRYINDEX, obj_ref);
     end;
+end;
+
+procedure plua_ref_release(l : PLua_State; obj:PLuaInstanceInfo);overload;
+begin
+  plua_ref_release(l, obj^.LuaRef);
+  obj^.LuaRef:=LUA_NOREF;
 end;
 
 function plua_instance_new: PLuaInstanceInfo;
@@ -401,7 +407,7 @@ begin
   obj_user:=lua_newuserdata(L, sizeof(PObject));
   obj_user^:=TObject(instance);
 
-  luaL_getmetatable(l, ClassMetaTableName(cinfo) );
+  luaL_getmetatable(l, PChar(ClassMetaTableName(cinfo)) );
   lua_setmetatable(l, -2);
 
   result := 1;
@@ -411,7 +417,10 @@ function plua_gc_class(l : PLua_State) : integer; cdecl;
 var
   nfo : PLuaInstanceInfo;
   d   : TLuaObjectEventDelegate;
+  ref : Integer;
 begin
+  result := 0;
+
   nfo := plua_getObjectInfo(l, 1);
   if not assigned(nfo) then
     exit;
@@ -420,10 +429,11 @@ begin
   if assigned(d) then
     d.Free;
 
-  plua_ref_release(l, nfo);
-
+  //to avoid double release,
+  //first release object and only after release reference
+  ref:=nfo^.LuaRef;
   LuaObjects_Free(nfo);
-  result := 0;
+  plua_ref_release(l, ref);
 end;
 
 (*
@@ -576,13 +586,13 @@ begin
   plua_pushstring(l, classInfo.ClassName);
   lua_newtable(l);
 
-  if luaL_newmetatable(l, ClassMetaTableName(@classInfo) ) <> 1 then
+  if luaL_newmetatable(l, PChar(ClassMetaTableName(@classInfo)) ) <> 1 then
     raise Exception.Create('Cannot create metatable');
 
   lua_setmetatable(l, -2);
   lua_settable(l, LUA_GLOBALSINDEX);
 
-  luaL_getmetatable(l, ClassMetaTableName(@classInfo) );
+  luaL_getmetatable(l, PChar(ClassMetaTableName(@classInfo)) );
   midx := lua_gettop(l);
 
   lua_pushstring(L, '__call');
@@ -780,7 +790,7 @@ begin
 
       LogDebug('plua_pushexisting. Object $%x. LuaRef=%d', [ PtrInt(ObjectInstance), instance^.LuaRef ]);
 
-      luaL_getmetatable(l, ClassMetaTableName(cinfo) );
+      luaL_getmetatable(l, PChar(ClassMetaTableName(cinfo)) );
       lua_setmetatable(l, -2);
     end;
   plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
