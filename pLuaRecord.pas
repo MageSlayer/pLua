@@ -382,46 +382,9 @@ end;
 function plua_registerExistingRecord(l: PLua_State; InstanceName: AnsiString;
   RecordPointer: Pointer; RecordInfo: PLuaRecordInfo; FreeOnGC: Boolean
   ): PLuaRecordInstanceInfo;
-var
-  oidx    : Integer;
-  rInfo   : PLuaRecordInfo;
-  instance: PLuaRecordInstanceInfo;
 begin
-  rInfo := RecordInfo;
-  
-  instance := plua_GetRecordInfo(l, RecordPointer);
-  if assigned(instance) then
-    begin
-      result := instance;
-      exit;
-    end;
-
-  new(instance);
-  result := instance;
-  instance^.OwnsInstance := FreeOnGC;
-  instance^.RecordInfo := rInfo;
-  instance^.l := l;
-
-  instance^.RecordPointer := RecordPointer;
-  intLuaRecords.Add(pointer(instance));
-
   plua_pushstring(l, InstanceName);
-  lua_newtable(L);
-  instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
-  lua_rawgeti(l, LUA_REGISTRYINDEX, instance^.LuaRef);
-  oidx := lua_gettop(L);
-
-  lua_pushliteral(L, '__instance');
-  lua_pushinteger(L, PtrInt(instance));
-  lua_rawset(l, oidx);
-
-  lua_pushstring(L, 'release');
-  lua_pushcfunction(L, @plua_gc_record);
-  lua_rawset(L, oidx);
-
-  luaL_getmetatable(l, PChar(RecordMetaTableName(rInfo)));
-  lua_setmetatable(l, -2);
-
+  Result:=plua_pushexisting(l, RecordPointer, RecordInfo, FreeOnGC);
   lua_settable(l, LUA_GLOBALSINDEX );
 end;
 
@@ -430,37 +393,35 @@ function plua_pushexisting(l: PLua_State; RecordPointer: Pointer;
 var
   oidx    : Integer;
   rInfo   : PLuaRecordInfo;
-  instance: PLuaRecordInstanceInfo;
   obj_user: ^PLuaRecordInstanceInfo;
 begin
-  instance := plua_GetRecordInfo(l, RecordPointer);
-  if assigned(instance) then
+  Result := plua_GetRecordInfo(l, RecordPointer);
+  if assigned(Result) then
     begin
-      plua_PushRecord(instance);
+      plua_PushRecord(Result);
       exit;
     end;
 
   rInfo := RecordInfo;
 
-  new(instance);
-  result := instance;
-  instance^.OwnsInstance := FreeOnGC;
-  instance^.RecordInfo := rInfo;
-  instance^.l := l;
-  instance^.RecordPointer := RecordPointer;
+  new(Result);
+  Result^.OwnsInstance := FreeOnGC;
+  Result^.RecordInfo := rInfo;
+  Result^.l := l;
+  Result^.RecordPointer := RecordPointer;
 
-  intLuaRecords.Add(pointer(instance));
+  intLuaRecords.Add(pointer(Result));
 
   lua_newtable(L);
   oidx := lua_gettop(L);
 
   lua_pushliteral(L, '__instance');
-  lua_pushinteger(L, PtrInt(instance));
+  lua_pushinteger(L, PtrInt(Result));
   lua_rawset(l, oidx);
 
   lua_pushliteral(L, '__instance2');
   obj_user:=lua_newuserdata(L, sizeof(obj_user));
-  obj_user^:=instance;
+  obj_user^:=Result;
   Result^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
   lua_rawgeti(l, LUA_REGISTRYINDEX, Result^.LuaRef);
   luaL_getmetatable(l, PChar(RecordMetaTableName(rinfo)));
