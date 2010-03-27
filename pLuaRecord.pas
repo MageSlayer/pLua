@@ -130,9 +130,11 @@ implementation
 var
   intLuaRecords : TList;
 
-function RecordMetaTableName(cinfo:PLuaRecordInfo):PChar;
+
+function RecordMetaTableName(cinfo:PLuaRecordInfo):string;
 begin
-  Result:=PChar(cinfo^.RecordName+'_mt');
+  //returning PChar(cinfo^.RecordName+'_mt') gives a memory leak :[
+  Result:=cinfo^.RecordName+'_mt';
 end;
 
 function plua_gc_record(l : PLua_State) : integer; cdecl; forward;
@@ -243,7 +245,7 @@ begin
   lua_pushcfunction(L, @plua_gc_record);
   lua_rawset(L, oidx);
 
-  luaL_getmetatable(l, PChar(rInfo^.recordName+'_mt'));
+  luaL_getmetatable(l, PChar(RecordMetaTableName(rInfo)));
   lua_setmetatable(l, -2);
 
   result := 1;
@@ -299,11 +301,11 @@ begin
   plua_pushstring(l, RecordInfo.RecordName);
   lua_newtable(l);
 
-  luaL_newmetatable(l, PChar(RecordInfo.RecordName+'_mt'));
+  luaL_newmetatable(l, PChar(RecordMetaTableName(@RecordInfo)));
   lua_setmetatable(l, -2);
   lua_settable(l, LUA_GLOBALSINDEX);
 
-  luaL_getmetatable(l, PChar(RecordInfo.RecordName+'_mt'));
+  luaL_getmetatable(l, PChar(RecordMetaTableName(@RecordInfo)));
   midx := lua_gettop(l);
 
   plua_pushstring(l, RecordInfo.RecordName);
@@ -419,7 +421,7 @@ begin
   lua_pushcfunction(L, @plua_gc_record);
   lua_rawset(L, oidx);
 
-  luaL_getmetatable(l, PChar(rInfo^.RecordName+'_mt'));
+  luaL_getmetatable(l, PChar(RecordMetaTableName(rInfo)));
   lua_setmetatable(l, -2);
 
   lua_settable(l, LUA_GLOBALSINDEX );
@@ -465,11 +467,11 @@ begin
   obj_user^:=instance;
   Result^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
   lua_rawgeti(l, LUA_REGISTRYINDEX, Result^.LuaRef);
-  luaL_getmetatable(l, PChar(rinfo^.RecordName+'_mt'){RecordMetaTableName(rinfo)});
+  luaL_getmetatable(l, PChar(RecordMetaTableName(rinfo)));
   lua_setmetatable(l, -2);
   lua_rawset(l, oidx);
 
-  luaL_getmetatable(l, PChar(rinfo^.RecordName+'_mt'));
+  luaL_getmetatable(l, PChar(RecordMetaTableName(rinfo)));
   lua_setmetatable(l, -2);
 end;
 
