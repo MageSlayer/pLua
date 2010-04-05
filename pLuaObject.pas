@@ -431,9 +431,9 @@ begin
 
   //to avoid double release,
   //first release object and only after release reference
-  ref:=nfo^.LuaRef;
+  //ref:=nfo^.LuaRef;
   LuaObjects_Free(nfo);
-  plua_ref_release(l, ref);
+  //plua_ref_release(l, ref);
 end;
 
 (*

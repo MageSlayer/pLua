@@ -285,7 +285,7 @@ begin
       nfo^.RecordInfo^.Release(nfo^.RecordPointer, l);
       nfo^.RecordPointer := nil;
     end;
-  luaL_unref(L, LUA_REGISTRYINDEX, nfo^.LuaRef);
+  //luaL_unref(L, LUA_REGISTRYINDEX, nfo^.LuaRef);
   freemem(nfo);
   result := 0;
 end;
