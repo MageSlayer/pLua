@@ -161,6 +161,7 @@ function  plua_CallObjectEvent( ObjectInfo : PLuaInstanceInfo;
 function  plua_GetEventDeletage( Obj : TObject ) : TLuaObjectEventDelegate;
 
 procedure plua_ClearObjects(L : PLua_State; LeakWarnings:boolean);
+function plua_AllocatedObjCount:Integer;
 
 var
   LuaClasses     : TLuaClassList;
@@ -242,6 +243,11 @@ begin
   New(Result);
   FillChar(Result^, Sizeof(Result^), 0);
   Result^.LuaRef:=LUA_NOREF;
+end;
+
+function plua_AllocatedObjCount:Integer;
+begin
+  Result:=LuaObjects.Count;
 end;
 
 function plua_gc_class(l : PLua_State) : integer; cdecl; forward;
@@ -432,7 +438,9 @@ begin
   //to avoid double release,
   //first release object and only after release reference
   //ref:=nfo^.LuaRef;
+
   LuaObjects_Free(nfo);
+
   //plua_ref_release(l, ref);
 end;
 
@@ -959,8 +967,21 @@ end;
 function TLuaClassList.GetInfo(l : Plua_State; InstanceObject: TObject): PLuaInstanceInfo;
 var
   i : Integer;
+  P : PLuaInstanceInfo;
 begin
   result := nil;
+
+  for i:=0 to LuaObjects.Count-1 do
+    begin
+      P:=PLuaInstanceInfo(LuaObjects[i]);
+      if (P^.obj = InstanceObject) and (P^.l = l)
+         then
+         begin
+           result := P;
+           break;
+         end;
+    end;
+  {--
   i := 0;
   while (result = nil) and (i < LuaObjects.Count) do
     begin
@@ -969,6 +990,7 @@ begin
         result := PLuaInstanceInfo(LuaObjects[i]);
       inc(i);
     end;
+  }
 end;
 
 function TLuaClassList.Add(aClassInfo: TLuaClassInfo) : Integer;
