@@ -89,6 +89,7 @@ type
 
     procedure ObjArraySet(const varName:String; const A:TObjArray; C: PLuaClassInfo; FreeGC:boolean = False);
     procedure ObjSet(const varName:String; const O:TObject; C: PLuaClassInfo; FreeGC:boolean = False);
+    procedure ObjSetEmpty(const varName:String);
     function  ObjGet(const varName:string):TObject;
 
     procedure GlobalObjClear;
@@ -614,6 +615,12 @@ procedure TLUA.ObjSet(const varName: String; const O: TObject;
   C: PLuaClassInfo; FreeGC: boolean);
 begin
   pLuaObject.plua_pushexisting(l, O, C, FreeGC);
+  lua_setglobal( L, PChar(varName) );
+end;
+
+procedure TLUA.ObjSetEmpty(const varName: String);
+begin
+  lua_pushnil(l);
   lua_setglobal( L, PChar(varName) );
 end;
 
