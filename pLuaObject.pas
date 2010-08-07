@@ -147,7 +147,7 @@ function plua_pushexisting( l : PLua_State;
                             ObjectInstance : TObject;
                             classInfo : PLuaClassInfo;
                             FreeOnGC : Boolean = false) : PLuaInstanceInfo;
-procedure plua_ObjectMarkFree( l: Plua_State; ObjectInstance:TObject );
+function plua_ObjectMarkFree(l: Plua_State; ObjectInstance: TObject):boolean;
 
 function  plua_PushObject(ObjectInfo : PLuaInstanceInfo) : Boolean;
 function  plua_GetObjectInfo(l : Plua_State; InstanceObject : TObject) : PLuaInstanceInfo;
@@ -224,17 +224,18 @@ begin
   Result:=cinfo^.ClassName+'_mt';
 end;
 
-procedure plua_ref_release(l : PLua_State; obj_ref:Integer);overload;
+function plua_ref_release(l : PLua_State; obj_ref:Integer):boolean;overload;
 begin
-  if obj_ref <> LUA_NOREF then
+  Result:=obj_ref <> LUA_NOREF;
+  if Result then
     begin
       luaL_unref(L, LUA_REGISTRYINDEX, obj_ref);
     end;
 end;
 
-procedure plua_ref_release(l : PLua_State; obj:PLuaInstanceInfo);overload;
+function plua_ref_release(l : PLua_State; obj:PLuaInstanceInfo):boolean;overload;
 begin
-  plua_ref_release(l, obj^.LuaRef);
+  Result:=plua_ref_release(l, obj^.LuaRef);
   obj^.LuaRef:=LUA_NOREF;
 end;
 
@@ -804,7 +805,7 @@ begin
   plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
 end;
 
-procedure plua_ObjectMarkFree(l: Plua_State; ObjectInstance: TObject);
+function plua_ObjectMarkFree(l: Plua_State; ObjectInstance: TObject):boolean;
 var objinfo:PLuaInstanceInfo;
 begin
   objinfo := plua_GetObjectInfo(l, ObjectInstance);
@@ -812,7 +813,7 @@ begin
      raise LuaException.CreateFmt('Object $%x does not have object info', [PtrInt(ObjectInstance)]);
 
   //remove reference
-  plua_ref_release(l, objinfo);
+  Result:=plua_ref_release(l, objinfo);
 end;
 
 function plua_PushObject(ObjectInfo: PLuaInstanceInfo) : Boolean;

@@ -56,7 +56,7 @@ type
     procedure Open;
 
     //mark given object as being ready for garbage collection
-    procedure ObjMarkFree(Obj:TObject);overload;
+    function ObjMarkFree(Obj:TObject):boolean;overload;
     procedure ObjMarkFree(const Obj:TObjArray);overload;
 
     procedure GarbageCollect;
@@ -454,10 +454,11 @@ begin
   OpenLibs;
 end;
 
-procedure TLUA.ObjMarkFree(Obj: TObject);
+function TLUA.ObjMarkFree(Obj: TObject):boolean;
 begin
+  Result:=False;
   if l <> nil then
-    plua_ObjectMarkFree(l, Obj);
+    Result:=plua_ObjectMarkFree(l, Obj);
 end;
 
 procedure TLUA.ObjMarkFree(const Obj: TObjArray);
