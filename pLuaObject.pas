@@ -265,9 +265,10 @@ var
 begin
   result := 0;
   pcount := lua_gettop(l);
+  {
   if not lua_istable(l, 1) then
     exit;
-
+  }
   cInfo := plua_getObjectInfo(l, 1);
   if not assigned(cInfo) then
     exit;
@@ -304,8 +305,11 @@ var
 begin
   result := 0;
   pcount := lua_gettop(l);
+
+  {
   if not lua_istable(l, 1) then
     exit;
+  }
 
   cinfo := plua_getObjectInfo(l, 1);
   if not assigned(cInfo) then
@@ -581,7 +585,7 @@ begin
 end;
 
 procedure plua_registerclass(l: PLua_State; const classInfo: TLuaClassInfo);
-var midx, StartTop : integer;
+var midx, StartTop, i : integer;
 begin
   LogDebug('Registering class %s.', [classInfo.ClassName]);
 
@@ -607,9 +611,31 @@ begin
   lua_pushstring(L, '__call');
   lua_pushcfunction(L, @plua_new_class);
   lua_rawset(L, midx);
+
   lua_pushstring(L, '__gc');
   lua_pushcfunction(L, @plua_gc_class);
   lua_rawset(L, midx);
+
+  lua_pushstring(L, '__index');
+  lua_pushcfunction(L, @plua_index_class);
+  lua_rawset(L, midx);
+
+  lua_pushstring(L, '__newindex');
+  lua_pushcfunction(L, @plua_newindex_class);
+  lua_rawset(L, midx);
+
+  {еще не оттестировано!
+  Log('Registering class methods.');
+  // TODO - Add parent method calls in
+  for i := 0 to Length(classInfo.Methods)-1 do
+    begin
+      plua_pushstring(L, classInfo.Methods[i].MethodName);
+      lua_pushinteger(l, PtrInt(classInfo.Methods[i].wrapper));
+      lua_pushcclosure(L, @plua_call_class_method, 1);
+      lua_rawset(l, -3);
+    end;
+  Log('Registering class methods - done.');
+  }
 
   lua_pop(l, 1);
 
