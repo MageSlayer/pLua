@@ -181,7 +181,7 @@ type
 var
   LuaObjects : TList;
 
-procedure Log(const Text:string);
+procedure Log(const Text:string);inline;
 begin
   //if log handler assigned, then logging
   if @LogFunction <> nil then
@@ -204,14 +204,14 @@ begin
     DumpStackTraceFunction;
 end;
 
-procedure LogDebug(const TextFmt:string; Args:array of const);
+procedure LogDebug(const TextFmt:string; Args:array of const);inline;
 begin
   {$IFDEF DEBUG_LUA}
   LogFmt( TextFmt, Args );
   {$ENDIF}
 end;
 
-procedure LogDebug(const Text:string);
+procedure LogDebug(const Text:string);inline;
 begin
   {$IFDEF DEBUG_LUA}
   Log( Text );
@@ -265,10 +265,7 @@ var
 begin
   result := 0;
   pcount := lua_gettop(l);
-  {
-  if not lua_istable(l, 1) then
-    exit;
-  }
+
   cInfo := plua_getObjectInfo(l, 1);
   if not assigned(cInfo) then
     exit;
@@ -305,11 +302,6 @@ var
 begin
   result := 0;
   pcount := lua_gettop(l);
-
-  {
-  if not lua_istable(l, 1) then
-    exit;
-  }
 
   cinfo := plua_getObjectInfo(l, 1);
   if not assigned(cInfo) then
@@ -586,15 +578,26 @@ end;
 
 procedure plua_registerclass(l: PLua_State; const classInfo: TLuaClassInfo);
 var midx, StartTop, i : integer;
+    registered:boolean;
 begin
   LogDebug('Registering class %s.', [classInfo.ClassName]);
 
   StartTop := lua_gettop(l);
 
-  //skip re-registering classes.
-  if LuaClasses.IndexOf( classinfo.ClassName ) <> -1 then Exit;
+  //already registered?
+  luaL_getmetatable(l, PChar(ClassMetaTableName(@classInfo)) );
+  registered:=lua_istable(l, -1);
+  lua_pop(l, 1);
+  if registered then
+    begin
+      Exit;
+    end;
 
-  {lidx := }LuaClasses.Add(classInfo);
+  //skip re-registering classes.
+  if LuaClasses.IndexOf( classinfo.ClassName ) = -1 then
+    begin
+      LuaClasses.Add(classInfo);
+    end;
 
   plua_pushstring(l, classInfo.ClassName);
   lua_newtable(l);
@@ -624,7 +627,8 @@ begin
   lua_pushcfunction(L, @plua_newindex_class);
   lua_rawset(L, midx);
 
-  {еще не оттестировано!
+  {
+  //еще не оттестировано!
   Log('Registering class methods.');
   // TODO - Add parent method calls in
   for i := 0 to Length(classInfo.Methods)-1 do

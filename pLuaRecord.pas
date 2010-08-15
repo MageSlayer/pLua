@@ -294,8 +294,22 @@ procedure plua_registerRecordType(l: PLua_State; const RecordInfo: TLuaRecordInf
 var
   lidx, tidx, midx : integer;
   ci   : PLuaRecordInfo;
+  registered:boolean;
 begin
-  lidx := LuaRecords.Add(RecordInfo);
+  //already registered?
+  luaL_getmetatable(l, PChar(RecordMetaTableName(@RecordInfo)) );
+  registered:=lua_istable(l, -1);
+  lua_pop(l, 1);
+  if registered then
+    begin
+      Exit;
+    end;
+
+  lidx:=LuaRecords.IndexOf( RecordInfo.RecordName );
+  if lidx = -1 then
+    begin
+      lidx:=LuaRecords.Add(RecordInfo);
+    end;
 
   plua_pushstring(l, RecordInfo.RecordName);
   lua_newtable(l);
