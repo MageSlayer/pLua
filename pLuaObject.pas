@@ -776,6 +776,7 @@ begin
   if obj_user <> nil then
      Result:=PLuaInstanceInfo(obj_user^);
 
+  if lua_gettop(l) = idx then //злобный хак! Чтобы отказаться от него нужно потратить кучу времени на тестирование всего от него зависящего!
   lua_pop(l, 1);
 end;
 

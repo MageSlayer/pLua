@@ -58,12 +58,13 @@ uses
 
 function plua_tostring(L: PLua_State; Index: Integer): ansistring;
 var
-  Size: Integer;
+  Size: Cardinal;
+  S:PChar;
 begin
-  Size := lua_strlen(L, Index);
+  S := lua_tolstring(L, Index, @Size);
   SetLength(Result, Size);
   if (Size > 0) then
-    Move(lua_tostring(L, Index)^, Result[1], Size);
+    Move(S^, Result[1], Size);
 end;
 
 procedure plua_pushstring(L: PLua_State; AString: AnsiString);
