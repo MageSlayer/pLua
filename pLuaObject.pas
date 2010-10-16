@@ -777,7 +777,7 @@ begin
      Result:=PLuaInstanceInfo(obj_user^);
 
   if lua_gettop(l) = idx then //злобный хак! Чтобы отказаться от него нужно потратить кучу времени на тестирование всего от него зависящего!
-  lua_pop(l, 1);
+    lua_pop(l, 1);
 end;
 
 function plua_registerExisting(l: PLua_State; InstanceName: AnsiString;

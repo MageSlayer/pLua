@@ -51,6 +51,8 @@ procedure plua_RegisterMethod( l : Plua_State; aMethodName : AnsiString;
 
 procedure plua_GetTableKey( l : PLua_State; TableIndex : Integer; KeyName : AnsiString );
 
+function plua_typename(l : Plua_State; luatype:Integer ):string;
+
 implementation
 
 uses
@@ -330,6 +332,11 @@ begin
   TableIndex := plua_absindex(l, TableIndex);
   plua_pushstring(l, KeyName);
   lua_gettable(l, TableIndex);
+end;
+
+function plua_typename(l: Plua_State; luatype: Integer): string;
+begin
+  Result:=String( lua_typename(l, luatype) );
 end;
 
 end.
