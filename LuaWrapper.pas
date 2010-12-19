@@ -632,10 +632,10 @@ begin
   try
     lua_pushstring(L, PChar(varName));
     lua_rawget(L, LUA_GLOBALSINDEX);
-    if lua_istable(L, -1) then
+    if lua_isuserdata(L, -1) then
       begin
         tblidx:=lua_gettop(L);
-        Result:=plua_getObject(l, tblidx);
+        Result:=plua_getObject(l, tblidx, False);
       end;
   finally
     lua_pop(L, 1);
