@@ -142,11 +142,14 @@ function plua_getObjectInfo( l : PLua_State; idx : Integer) : PLuaInstanceInfo;
 function plua_registerExisting( l : PLua_State; InstanceName : AnsiString;
                                 ObjectInstance : TObject;
                                 classInfo : PLuaClassInfo;
-                                FreeOnGC : Boolean = false) : PLuaInstanceInfo;
+                                FreeOnGC : Boolean = false; KeepRef:boolean = True) : PLuaInstanceInfo;
+//функция заталкивает в стек объект.
+//Внимание!!! Если KeepRef = true, то во внутреннем списке объекте сохраняется ссылка на объект
+//то есть необходимо будет удаление объекта вручную!!!
 function plua_pushexisting( l : PLua_State;
                             ObjectInstance : TObject;
                             classInfo : PLuaClassInfo;
-                            FreeOnGC : Boolean = false) : PLuaInstanceInfo;
+                            FreeOnGC : Boolean = false; KeepRef:boolean = True) : PLuaInstanceInfo;
 function plua_ObjectMarkFree(l: Plua_State; ObjectInstance: TObject):boolean;
 
 function  plua_PushObject(ObjectInfo : PLuaInstanceInfo) : Boolean;
@@ -566,14 +569,18 @@ end;
 
 procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer; TypeOnTop:integer = LUA_TNONE);
 var CurStack:Integer;
+    ActualTypeOnTop:Integer;
 begin
   CurStack:=lua_gettop(l);
   if CurStack <> TopToBe then
     raise Exception.CreateFmt('Lua stack is unbalanced. %d, should be %d', [CurStack, TopToBe]);
 
-  if (TypeOnTop <> LUA_TNONE) and
-     (lua_type(l, -1) <> TypeOnTop) then
-     raise Exception.Create('Wrong type pushed');
+  if (TypeOnTop <> LUA_TNONE) then
+    begin
+      ActualTypeOnTop:=lua_type(l, -1);
+      if ActualTypeOnTop <> TypeOnTop then
+        raise Exception.CreateFmt('Wrong type pushed (%d)', [ActualTypeOnTop]);
+    end;
 end;
 
 procedure plua_registerclass(l: PLua_State; const classInfo: TLuaClassInfo);
@@ -782,16 +789,16 @@ end;
 
 function plua_registerExisting(l: PLua_State; InstanceName: AnsiString;
   ObjectInstance: TObject; classInfo: PLuaClassInfo;
-  FreeOnGC : Boolean = false) : PLuaInstanceInfo;
+  FreeOnGC : Boolean; KeepRef:boolean) : PLuaInstanceInfo;
 begin
   plua_pushstring(l, InstanceName);
-  Result:=plua_pushexisting(l, ObjectInstance, classInfo, FreeOnGC);
+  Result:=plua_pushexisting(l, ObjectInstance, classInfo, FreeOnGC, KeepRef);
 
   lua_settable(l, LUA_GLOBALSINDEX );
 end;
 
 function plua_pushexisting(l: PLua_State; ObjectInstance: TObject;
-  classInfo: PLuaClassInfo; FreeOnGC: Boolean): PLuaInstanceInfo;
+  classInfo: PLuaClassInfo; FreeOnGC: Boolean; KeepRef:boolean): PLuaInstanceInfo;
 var
   i, n, tidx, midx, classID,
   oidx, StartTop : Integer;
@@ -825,8 +832,11 @@ begin
       obj_user:=lua_newuserdata(L, sizeof(PObject));
       obj_user^:=TObject(instance);
 
-      instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
-      lua_rawgeti(instance^.l, LUA_REGISTRYINDEX, instance^.LuaRef);
+      if KeepRef then
+        begin
+          instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
+          lua_rawgeti(instance^.l, LUA_REGISTRYINDEX, instance^.LuaRef);
+        end;
 
       LogDebug('plua_pushexisting. Object $%x. LuaRef=%d', [ PtrInt(ObjectInstance), instance^.LuaRef ]);
 
