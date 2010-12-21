@@ -832,7 +832,9 @@ begin
       obj_user:=lua_newuserdata(L, sizeof(PObject));
       obj_user^:=TObject(instance);
 
-      if KeepRef then
+      if not KeepRef then
+        instance^.LuaRef:=LUA_NOREF
+        else
         begin
           instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
           lua_rawgeti(instance^.l, LUA_REGISTRYINDEX, instance^.LuaRef);
