@@ -75,6 +75,7 @@ type
     function  ExecuteAsFunctionObjList(const FunctionName:string):TObjArray;
 
     procedure ExecuteCmd(Script:AnsiString);
+    procedure ExecuteAsRepl(const Script:String; out ReplResult:string);
     procedure ExecuteFile(FileName : AnsiString);
     procedure RegisterLuaMethod(aMethodName: AnsiString; Func: lua_CFunction);
     procedure RegisterLuaTable(PropName: AnsiString; reader: lua_CFunction; writer : lua_CFunction = nil);
@@ -264,6 +265,42 @@ begin
     Open;
   ErrorTest(luaL_loadbuffer(L, PChar(Script), Length(Script), PChar(LibName)));
   ExecuteScript(0);
+end;
+
+procedure TLUA.ExecuteAsRepl(const Script: String; out ReplResult: string);
+var StartTop:Integer;
+    r:String;
+    ExceptThrown:boolean;
+begin
+  ExceptThrown:=false;
+  ReplResult:='';
+  if L= nil then
+    Open;
+  StartTop:=lua_gettop(l);
+
+  try
+    ErrorTest(luaL_loadbuffer(L, PChar(Script), Length(Script), PChar(LibName)));
+    ExecuteScript(LUA_MULTRET); // LUA_MULTRET - нас интересуют _все_ результаты
+  except
+    on E:Exception do
+      begin
+        ReplResult:=E.Message + sLineBreak;
+        ExceptThrown:=true;
+      end;
+  end;
+
+  //пока есть результаты - продолжаем выталкивать из стека
+  while lua_gettop(l) <> StartTop do
+  begin
+    if (not ExceptThrown) and (lua_type(L,-1) = LUA_TSTRING) then
+      begin
+        r := plua_tostring(l, -1);
+        ReplResult:=r + sLineBreak + ReplResult; //последний результат лежит на верху стека
+      end;
+    lua_pop(l, 1);
+  end;
+
+  plua_CheckStackBalance(l, StartTop);
 end;
 
 procedure TLUA.ExecuteFile(FileName: AnsiString);
