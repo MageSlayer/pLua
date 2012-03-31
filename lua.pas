@@ -33,7 +33,11 @@ const
   LuaDLL = 'lua5.1.dylib';
 {$ELSE}
   //LuaDLL = 'lua5.1.so';
+  {$IFDEF LUAJIT}
+  LuaDLL = 'libluajit-5.1.so';
+  {$ELSE}
   LuaDLL = 'liblua.so.5';
+  {$ENDIF}
 {$ENDIF}
 {$ENDIF}
 {$IFDEF MACOS}
