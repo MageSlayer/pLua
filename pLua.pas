@@ -73,6 +73,17 @@ function plua_FunctionCompile(l: PLua_State; const FuncCode:string; const Substs
 //report error from lua called functions
 procedure lua_reporterror(l : PLua_State; const ErrMes:string);
 
+var
+  LogFunction             : procedure (const Text:string) = nil;
+  DumpStackTraceFunction  : procedure = nil;
+
+procedure Log(const Text:string);inline;overload;
+procedure LogFmt(const TextFmt:string; Args:array of const);overload;
+procedure Log(const TextFmt:string; Args:array of const);overload;
+procedure DumpStackTrace;
+procedure LogDebug(const TextFmt:string; Args:array of const);inline;overload;
+procedure LogDebug(const Text:string);inline;overload;
+
 implementation
 
 uses
@@ -470,6 +481,44 @@ begin
 
   Result:=plua_FunctionCompile(l, S);
 end;
+
+procedure Log(const Text:string);inline;
+begin
+  //if log handler assigned, then logging
+  if @LogFunction <> nil then
+    LogFunction( Text );
+end;
+
+procedure LogFmt(const TextFmt:string; Args:array of const);
+begin
+  Log( Format(TextFmt, Args) );
+end;
+
+procedure Log(const TextFmt:string; Args:array of const);
+begin
+  LogFmt( TextFmt, Args );
+end;
+
+procedure DumpStackTrace;
+begin
+  if @DumpStackTraceFunction <> nil then
+    DumpStackTraceFunction;
+end;
+
+procedure LogDebug(const TextFmt:string; Args:array of const);inline;
+begin
+  {$IFDEF DEBUG_LUA}
+  LogFmt( TextFmt, Args );
+  {$ENDIF}
+end;
+
+procedure LogDebug(const Text:string);inline;
+begin
+  {$IFDEF DEBUG_LUA}
+  Log( Text );
+  {$ENDIF}
+end;
+
 
 end.
 

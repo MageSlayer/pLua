@@ -121,15 +121,8 @@ procedure plua_PushRecordToTable( L : PLua_State; RecordPointer : Pointer;
 
 procedure plua_ClearRecords( L : PLua_State );
 
-var
-  LuaRecords : TLuaRecordList;
-  RecordTypesList : TLuaRecordTypesList;
-  
 implementation
-
-var
-  intLuaRecords : TList;
-
+uses LuaWrapper;
 
 function RecordMetaTableName(cinfo:PLuaRecordInfo):string;
 begin
@@ -160,7 +153,7 @@ begin
 
   propName := plua_tostring(l, 2);
   propValueStart := 3;
-  reader := LuaRecords.GetPropReader(rInfo^.recordInfo, propName);
+  reader := LuaSelf(l).LuaRecords.GetPropReader(rInfo^.recordInfo, propName);
   if assigned(reader) then
     result := reader(rec, l, propValueStart, pcount);
 end;
@@ -187,7 +180,7 @@ begin
 
   propName := plua_tostring(l, 2);
   propValueStart := 3;
-  writer := LuaRecords.GetPropWriter(rInfo^.recordInfo, propName, bReadOnly);
+  writer := LuaSelf(l).LuaRecords.GetPropWriter(rInfo^.recordInfo, propName, bReadOnly);
   if assigned(writer) then
     result := writer(rec, l, propValueStart, pcount)
   else
@@ -229,7 +222,7 @@ begin
   instance^.recordInfo := rInfo;
   instance^.l := l;
   instance^.RecordPointer := rInfo^.New(l, 2, pcount, instance);
-  intLuaRecords.Add(pointer(instance));
+  LuaSelf(l).intLuaRecords.Add(pointer(instance));
 
   lua_newtable(L);
   instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
@@ -279,7 +272,7 @@ begin
   nfo:=plua_getRecordInfoFromUserData(l, 1);
   if not assigned(nfo) then
     exit;
-  intLuaRecords.Remove(nfo);
+  LuaSelf(l).intLuaRecords.Remove(nfo);
   if nfo^.OwnsInstance then
     begin
       nfo^.RecordInfo^.Release(nfo^.RecordPointer, l);
@@ -295,6 +288,7 @@ var
   lidx, tidx, midx : integer;
   ci   : PLuaRecordInfo;
   registered:boolean;
+  S:TLuaInternalState;
 begin
   //already registered?
   luaL_getmetatable(l, PChar(RecordMetaTableName(@RecordInfo)) );
@@ -305,10 +299,11 @@ begin
       Exit;
     end;
 
-  lidx:=LuaRecords.IndexOf( RecordInfo.RecordName );
+  S:=LuaSelf(l);
+  lidx:=S.LuaRecords.IndexOf( RecordInfo.RecordName );
   if lidx = -1 then
     begin
-      lidx:=LuaRecords.Add(RecordInfo);
+      lidx:=S.LuaRecords.Add(RecordInfo);
     end;
 
   plua_pushstring(l, RecordInfo.RecordName);
@@ -340,7 +335,7 @@ begin
   lua_pushinteger(L, lidx);
   lua_rawset(L, tidx);
   lua_pushstring(L, '__recordPTR');
-  ci := LuaRecords.RecordInfo[lidx];
+  ci := S.LuaRecords.RecordInfo[lidx];
   lua_pushinteger(L, PtrInt(ci));
   lua_rawset(L, tidx);
 
@@ -424,7 +419,7 @@ begin
   Result^.l := l;
   Result^.RecordPointer := RecordPointer;
 
-  intLuaRecords.Add(pointer(Result));
+  LuaSelf(l).intLuaRecords.Add(pointer(Result));
 
   lua_newtable(L);
   oidx := lua_gettop(L);
@@ -490,7 +485,7 @@ end;
 
 function plua_GetRecordInfo(l : PLua_State; RecordPointer: Pointer): PLuaRecordInstanceInfo;
 begin
-  Result:=LuaRecords.GetInfo(l, RecordPointer);
+  Result:=LuaSelf(l).LuaRecords.GetInfo(l, RecordPointer);
 end;
 
 procedure plua_PushRecordToTable(L: PLua_State; RecordPointer: Pointer;
@@ -513,13 +508,15 @@ procedure plua_ClearRecords(L: PLua_State);
 var
   i   : Integer;
   nfo : PLuaRecordInstanceInfo;
+  S   : TLuaInternalState;
 begin
-  i := intLuaRecords.Count-1;
+  S:=LuaSelf(l);
+  i := S.intLuaRecords.Count-1;
   while i > -1 do
     begin
-      nfo := PLuaRecordInstanceInfo(intLuaRecords[i]);
+      nfo := PLuaRecordInstanceInfo(S.intLuaRecords[i]);
       if nfo^.l = l then
-        intLuaRecords.Remove(nfo);
+        S.intLuaRecords.Remove(nfo);
       dec(i);
     end;
 end;
@@ -588,14 +585,17 @@ function TLuaRecordList.GetInfo(l : PLua_State; RecordPointer: Pointer
   ): PLuaRecordInstanceInfo;
 var
   i : Integer;
+  S:TLuaInternalState;
 begin
   result := nil;
   i := 0;
-  while (result = nil) and (i < intLuaRecords.Count) do
+  S:=LuaSelf(l);
+
+  while (result = nil) and (i < S.intLuaRecords.Count) do
     begin
-      if (PLuaRecordInstanceInfo(intLuaRecords[i])^.RecordPointer = RecordPointer) and
-         (PLuaRecordInstanceInfo(intLuaRecords[i])^.l = l) then
-        result := PLuaRecordInstanceInfo(intLuaRecords[i]);
+      if (PLuaRecordInstanceInfo(S.intLuaRecords[i])^.RecordPointer = RecordPointer) and
+         (PLuaRecordInstanceInfo(S.intLuaRecords[i])^.l = l) then
+        result := PLuaRecordInstanceInfo(S.intLuaRecords[i]);
       inc(i);
     end;
 end;
@@ -728,28 +728,5 @@ begin
   for i := 0 to Count-1 do
     plua_registerRecordType(l, IndexedItem[i]^);
 end;
-
-var
-  instance : PLuaRecordInstanceInfo;
-
-initialization
-  RecordTypesList := TLuaRecordTypesList.Create;
-  LuaRecords := TLuaRecordList.Create;
-  intLuaRecords := TList.Create;
-
-finalization
-  RecordTypesList.Free;
-  LuaRecords.Free;
-  LuaRecords := nil;
-  while intLuaRecords.Count > 0 do
-    begin
-      instance := PLuaRecordInstanceInfo(intLuaRecords[intLuaRecords.Count-1]);
-      intLuaRecords.Delete(intLuaRecords.Count-1);
-      if instance^.OwnsInstance then
-        instance^.RecordInfo^.Release(instance, nil);
-      Freemem(instance);
-    end;
-  intLuaRecords.Free;
-  intLuaRecords := nil;
 
 end.

@@ -13,7 +13,7 @@ uses
   Classes,
   lua,
   pLua,
-  pLuaObject;
+  pLuaObject, pLuaRecord;
 
 type
   TLua = class;
@@ -33,6 +33,16 @@ type
     FLibFile,
     FLibName: AnsiString;
     FMethods : TStringList;
+
+    //Lua internal objects
+    FLuaObjects : TList;
+    FLuaClasses : TLuaClassList;
+    FLuaRecords : TLuaRecordList;
+    FintLuaRecords : TList;
+    FLuaDelegates : TList;
+    FClassTypesList : TLuaClassTypesList;
+    FRecordTypesList : TLuaRecordTypesList;
+
     function  GetLuaCPath: AnsiString;
     function  GetLuaPath: AnsiString;
     function  GetValue(valName : AnsiString): Variant;
@@ -108,6 +118,18 @@ type
     property OnLoadLibs : TLuaOnLoadLibs read FOnLoadLibs write SetOnLoadLibs;
   end;
 
+  TLuaInternalState = class(TLua)
+    //class to be used by Lua handlers
+    public
+      property LuaObjects : TList read FLuaObjects;
+      property LuaClasses : TLuaClassList read FLuaClasses;
+      property intLuaRecords : TList read FintLuaRecords;
+      property LuaDelegates : TList read FLuaDelegates;
+      property LuaRecords : TLuaRecordList read FLuaRecords;
+      property ClassTypesList : TLuaClassTypesList read FClassTypesList;
+      property RecordTypesList : TLuaRecordTypesList read FRecordTypesList;
+  end;
+
   { TLUAThread }
   TLUAThread=class
   private
@@ -154,18 +176,35 @@ type
     property Count : Integer read GetCount;
   end;
 
+  //To be used in Lua handlers
+  //Use carefully, it is global for Lua instance!!!
+  function LuaSelf(L : PLua_State):TLuaInternalState;
+  procedure LuaObjects_Free(S:TLuaInternalState; instance:PLuaInstanceInfo);
+  procedure LuaObjects_Add(S:TLuaInternalState; instance:PLuaInstanceInfo);
+
 implementation
 
 uses
   Variants,
-  SysUtils,
-  pLuaRecord;
+  SysUtils;
+
+const
+  Lua_Self = '__LuaWrapperSelf';
 
 constructor TLUA.Create{$IFDEF TLuaAsComponent}(anOwner: TComponent){$ENDIF};
 begin
   {$IFDEF TLuaAsComponent}inherited;{$ENDIF}
   FUseDebug := false;
   FMethods := TStringList.Create;
+
+  FLuaObjects := TList.Create;
+  FLuaClasses := TLuaClassList.Create;
+  FintLuaRecords := TList.Create;
+  FLuaDelegates := TList.Create;
+  FLuaRecords := TLuaRecordList.Create;
+  FClassTypesList := TLuaClassTypesList.Create;
+  FRecordTypesList := TLuaRecordTypesList.Create;
+
   Open;
 end;
 
@@ -177,9 +216,41 @@ end;
 {$ENDIF}
 
 destructor TLUA.Destroy;
+var instance:PLuaInstanceInfo;
+    rec_instance:PLuaRecordInstanceInfo;
 begin
   Close;
   FMethods.Free;
+
+  if FLuaObjects.Count > 0 then
+    Log('Warning!!! %d objects left unfreed.', [FLuaObjects.Count]);
+
+  while FLuaObjects.Count > 0 do
+    begin
+      instance := PLuaInstanceInfo(FLuaObjects[FLuaObjects.Count-1]);
+      Log('Freeing class "%s" instance.', [instance^.obj.ClassName]);
+
+      LuaObjects_Free(TLuaInternalState(Self), instance);
+    end;
+  FreeAndNil(FLuaObjects);
+  FreeAndNil(FLuaClasses);
+
+  while FintLuaRecords.Count > 0 do
+    begin
+      rec_instance := PLuaRecordInstanceInfo(FintLuaRecords[FintLuaRecords.Count-1]);
+      FintLuaRecords.Delete(FintLuaRecords.Count-1);
+      if rec_instance^.OwnsInstance then
+        rec_instance^.RecordInfo^.Release(rec_instance, nil);
+      Freemem(rec_instance);
+    end;
+
+  FreeAndNil(FintLuaRecords);
+
+  FreeAndNil(FLuaDelegates);
+  FreeAndNil(FLuaRecords);
+  FreeAndNil(FClassTypesList);
+  FreeAndNil(FRecordTypesList);
+
   inherited;
 end;
 
@@ -489,6 +560,53 @@ begin
     Close;
   L := lua_open;
   OpenLibs;
+
+  //Register self in Lua VM to be able call from Lua code/native handlers
+  plua_pushexisting_special(l, Self, nil, False);
+  lua_setglobal( L, PChar(Lua_Self) );
+end;
+
+function LuaSelf(L: PLua_State): TLuaInternalState;
+var StartTop:Integer;
+begin
+  StartTop:=lua_gettop(l);
+  Result:=TLuaInternalState(plua_GlobalObjectGet(l, Lua_Self));
+
+  //global VM object MUST BE registered, otherwise something really wrong.
+  if Result = nil then
+    plua_RaiseException(l, StartTop, 'Global Lua VM Self pointer is not registered');
+
+  plua_CheckStackBalance(l, StartTop);
+end;
+
+procedure LuaObjects_Add(S:TLuaInternalState; instance:PLuaInstanceInfo);
+begin
+  S.LuaObjects.Add( instance );
+  {$IFDEF DEBUG_LUA}
+  DumpStackTrace;
+  {$ENDIF}
+end;
+
+procedure LuaObjects_Free(S:TLuaInternalState; instance:PLuaInstanceInfo);
+var i:integer;
+begin
+  i:=S.LuaObjects.IndexOf(instance);
+  if i <> -1 then
+    begin
+      if instance^.OwnsObject then
+        begin
+          if assigned(instance^.ClassInfo^.Release) then
+            instance^.ClassInfo^.Release(instance^.obj, nil)
+          else
+            instance^.obj.Free;
+        end;
+
+      if Instance^.Delegate <> nil then
+        Instance^.Delegate.Free;
+      Dispose(instance);
+
+      S.LuaObjects.Delete(i);
+    end;
 end;
 
 function TLUA.ObjMarkFree(Obj: TObject):boolean;
@@ -524,8 +642,8 @@ begin
   for I := 0 to FMethods.Count -1 do
     RegisterLUAMethod(FMethods[I], lua_CFunction(Pointer(FMethods.Objects[I])));
 
-  RecordTypesList.RegisterTo(L);
-  ClassTypesList.RegisterTo(L);
+  FRecordTypesList.RegisterTo(L);
+  FClassTypesList.RegisterTo(L);
 
   if assigned(FOnLoadLibs) then
     FOnLoadLibs(self);
@@ -663,20 +781,8 @@ begin
 end;
 
 function TLUA.ObjGet(const varName: string): TObject;
-var tblidx:integer;
 begin
-  Result:=nil;
-  try
-    lua_pushstring(L, PChar(varName));
-    lua_rawget(L, LUA_GLOBALSINDEX);
-    if lua_isuserdata(L, -1) then
-      begin
-        tblidx:=lua_gettop(L);
-        Result:=plua_getObject(l, tblidx, False);
-      end;
-  finally
-    lua_pop(L, 1);
-  end;
+  Result:=plua_GlobalObjectGet(l, varName);
 end;
 
 procedure TLUA.GlobalObjClear;
