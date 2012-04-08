@@ -70,10 +70,24 @@ function plua_FunctionCompile(l: PLua_State; const FuncCode:string):integer;over
 //same as above, but substitutes text in FuncCode
 function plua_FunctionCompile(l: PLua_State; const FuncCode:string; const Substs:array of const):integer;overload;
 
+//report error from lua called functions
+procedure lua_reporterror(l : PLua_State; const ErrMes:string);
+
 implementation
 
 uses
   Variants;
+
+procedure lua_reporterror(l : PLua_State; const ErrMes:string);
+begin
+  {$IFDEF LUAJIT}
+  //LuaJit wants native exceptions, not longjmp!
+  raise Exception.Create(ErrMes);
+  {$ELSE}
+  lua_pushstring(L, PChar(ErrMes));
+  lua_error(L); //does longjmp, almost the same as exception raising
+  {$ENDIF}
+end;
 
 function plua_tostring(L: PLua_State; Index: Integer): ansistring;
 var
