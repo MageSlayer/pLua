@@ -37,6 +37,9 @@ procedure plua_pushvariant( L : PLua_State; v : Variant);
 
 function  plua_TableToVariantArray( L: Plua_State; Index: Integer;
                                     Keys : TStrings = nil) : variant;
+
+procedure pLua_TableGlobalCreate(L : Plua_State; const TableName:string);
+
 function plua_tovariant(L: Plua_State; Index: Integer): Variant;
 
 function plua_absindex(L: Plua_State; Index: Integer): integer;
@@ -52,6 +55,20 @@ procedure plua_RegisterMethod( l : Plua_State; aMethodName : AnsiString;
 procedure plua_GetTableKey( l : PLua_State; TableIndex : Integer; KeyName : AnsiString );
 
 function plua_typename(l : Plua_State; luatype:Integer ):string;
+
+procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer; TypeOnTop:integer = LUA_TNONE);
+
+//pops all values from stack until stack is at TopToBe
+procedure plua_EnsureStackBalance(l: PLua_State; TopToBe:Integer);
+
+//Balance Lua stacka and throw exception
+procedure plua_RaiseException(l: PLua_State; TopToBe:Integer; const ErrMes:string);overload;
+procedure plua_RaiseException(l: PLua_State; TopToBe:Integer; const ErrMes:string; const Params:array of const);overload;
+
+//compiles function text FuncCode and pushes its chunk on stack
+function plua_FunctionCompile(l: PLua_State; const FuncCode:string):integer;overload;
+//same as above, but substitutes text in FuncCode
+function plua_FunctionCompile(l: PLua_State; const FuncCode:string; const Substs:array of const):integer;overload;
 
 implementation
 
@@ -205,6 +222,13 @@ begin
     result := VarArrayCreate([0,0], varvariant);
 end;
 
+procedure pLua_TableGlobalCreate(L: Plua_State; const TableName: string);
+begin
+  plua_pushstring(l, TableName);
+  lua_newtable(l);
+  lua_settable(l, LUA_GLOBALSINDEX);
+end;
+
 function plua_tovariant(L: Plua_State; Index: Integer): Variant;
 Var
   dataType :Integer;
@@ -337,6 +361,100 @@ end;
 function plua_typename(l: Plua_State; luatype: Integer): string;
 begin
   Result:=String( lua_typename(l, luatype) );
+end;
+
+procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer; TypeOnTop:integer = LUA_TNONE);
+var CurStack:Integer;
+    ActualTypeOnTop:Integer;
+begin
+  CurStack:=lua_gettop(l);
+  if CurStack <> TopToBe then
+    raise Exception.CreateFmt('Lua stack is unbalanced. %d, should be %d', [CurStack, TopToBe]);
+
+  if (TypeOnTop <> LUA_TNONE) then
+    begin
+      ActualTypeOnTop:=lua_type(l, -1);
+      if ActualTypeOnTop <> TypeOnTop then
+        raise Exception.CreateFmt('Wrong type pushed (%d)', [ActualTypeOnTop]);
+    end;
+end;
+
+procedure plua_EnsureStackBalance(l: PLua_State; TopToBe: Integer);
+begin
+  while lua_gettop(l) > TopToBe do
+  begin
+    lua_pop(l, 1);
+  end;
+end;
+
+procedure plua_RaiseException(l: PLua_State; TopToBe: Integer; const ErrMes: string);
+begin
+  plua_EnsureStackBalance(l, TopToBe);
+  raise Exception.Create(ErrMes);
+end;
+
+procedure plua_RaiseException(l: PLua_State; TopToBe: Integer; const ErrMes: string;
+  const Params: array of const);
+begin
+  plua_RaiseException(l, TopToBe, Format(ErrMes, Params));
+end;
+
+function plua_FunctionCompile(l: PLua_State; const FuncCode: string): integer;
+var S:string;
+begin
+  S:=Format('return (%s)(...)', [FuncCode]);
+  Result:=luaL_loadstring(l, PChar(S));
+end;
+
+function plua_FunctionCompile(l: PLua_State; const FuncCode: string; const Substs: array of const): integer;
+var S, StrFrom, StrTo:string;
+    i:Integer;
+begin
+  S:=FuncCode;
+
+  if Length(Substs) mod 2 <> 0 then
+    begin
+      //function expects pairs of values to replace
+      Result:=LUA_ERRERR;
+      Exit;
+    end;
+
+  i:=0;
+  while i < Length(Substs) do
+  begin
+    //read string to substitute
+    with Substs[i] do
+      case VType of
+        vtString:     StrFrom:=VString^;
+        vtAnsiString: StrFrom:=AnsiString(VAnsiString);
+        else
+          begin
+            Result:=LUA_ERRERR;
+            Exit;
+          end;
+      end;
+
+    //read value to substitute
+    with Substs[i+1] do
+      case VType of
+        vtString:     StrTo:=VString^;
+        vtAnsiString: StrTo:=AnsiString(VAnsiString);
+        vtInt64:      StrTo:=IntToStr(VInt64^);
+        vtInteger:    StrTo:=IntToStr(VInteger);
+        else
+          begin
+            Result:=LUA_ERRERR;
+            Exit;
+          end;
+      end;
+
+    S:=StringReplace(S, StrFrom, StrTo, [rfReplaceAll]);
+
+    //move to next pair
+    Inc(i, 2);
+  end;
+
+  Result:=plua_FunctionCompile(l, S);
 end;
 
 end.
