@@ -730,7 +730,9 @@ begin
   StartTop:=lua_gettop(l);
 
   Result := plua_GetObjectInfo(l, ObjectInstance);
-  if assigned(Result) then
+  if assigned(Result) and
+     (Result^.LuaRef <> LUA_NOREF) // is it possible to push a reference to existing object instead of object itself?
+    then
     begin
       plua_PushObject(Result);
     end
