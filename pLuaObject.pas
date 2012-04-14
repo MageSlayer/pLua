@@ -322,7 +322,7 @@ begin
   result := 0;
   pcount := lua_gettop(l);
   result := 0;
-  obj := plua_getObject(l, 1);
+  obj := plua_getObject(l, 1, False);
   method := plua_MethodWrapper(PtrInt(lua_tointeger(l, lua_upvalueindex(1))));
 
   if assigned(obj) and assigned(method) then
