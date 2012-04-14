@@ -145,13 +145,14 @@ function plua_registerExisting( l : PLua_State; InstanceName : AnsiString;
                                 ObjectInstance : TObject;
                                 classInfo : PLuaClassInfo;
                                 FreeOnGC : Boolean = false; KeepRef:boolean = True) : PLuaInstanceInfo;
-//функция заталкивает в стек объект.
-//Внимание!!! Если KeepRef = true, то во внутреннем списке объекте сохраняется ссылка на объект
-//то есть необходимо будет удаление объекта вручную!!!
+//Function pushes an object into stack.
 function plua_pushexisting( l : PLua_State;
                             ObjectInstance : TObject;
                             classInfo : PLuaClassInfo;
-                            FreeOnGC : Boolean = false; KeepRef:boolean = True) : PLuaInstanceInfo;
+                            FreeOnGC : Boolean = false; //Call native destructor on garbage collecting?
+                            KeepRef:boolean = True //Reference keeps garbage collector from freeing object, until application decides to release it.
+                                                   //If KeepRef is true, then application itself is responsible for freeing Lua object using pLua_ObjectMarkFree
+                            ) : PLuaInstanceInfo;
 
 //special object registering
 //e.g. Self for LuaWrapper.
@@ -160,7 +161,10 @@ function plua_pushexisting( l : PLua_State;
 function plua_pushexisting_special( l : PLua_State;
                             ObjectInstance : TObject;
                             classInfo: PLuaClassInfo; //Important!!! Can be nil here!
-                            FreeOnGC : Boolean = false; KeepRef:boolean = True) : PLuaInstanceInfo;
+                            FreeOnGC : Boolean = false;  //Call native destructor on garbage collecting?
+                            KeepRef:boolean = True //Reference keeps garbage collector from freeing object, until application decides to release it.
+                                                   //If KeepRef is true, then application itself is responsible for freeing Lua object using pLua_ObjectMarkFree
+                            ) : PLuaInstanceInfo;
 
 function plua_ObjectMarkFree(l: Plua_State; ObjectInstance: TObject):boolean;
 
@@ -642,19 +646,21 @@ begin
 end;
 
 function plua_GlobalObjectGet(l: PLua_State; const varName: string): TObject;
-var tblidx:integer;
+var StartTop:Integer;
 begin
   Result:=nil;
+  StartTop:=lua_gettop(l);
   try
     lua_pushstring(L, PChar(varName));
     lua_rawget(L, LUA_GLOBALSINDEX);
+
     if lua_isuserdata(L, -1) then
       begin
-        tblidx:=lua_gettop(L);
-        Result:=plua_getObject(l, tblidx, False);
+        Result:=plua_getObject(l, -1, False);
       end;
   finally
     lua_pop(L, 1);
+    plua_CheckStackBalance(l, StartTop);
   end;
 end;
 
@@ -718,7 +724,6 @@ function plua_registerExisting(l: PLua_State; InstanceName: AnsiString;
 begin
   plua_pushstring(l, InstanceName);
   Result:=plua_pushexisting(l, ObjectInstance, classInfo, FreeOnGC, KeepRef);
-
   lua_settable(l, LUA_GLOBALSINDEX );
 end;
 
@@ -790,11 +795,15 @@ end;
 
 function plua_PushObject(ObjectInfo: PLuaInstanceInfo) : Boolean;
 begin
-  result := true;
+  result := false;
   if assigned(ObjectInfo) then
-    lua_rawgeti(ObjectInfo^.l, LUA_REGISTRYINDEX, ObjectInfo^.LuaRef)
-  else
-    result := false;
+    begin
+      if ObjectInfo^.LuaRef = LUA_NOREF then
+         raise LuaException.CreateFmt('Object $%x does not have Lua ref. Can'' push it on stack', [PtrInt(ObjectInfo^.obj)]);
+
+      lua_rawgeti(ObjectInfo^.l, LUA_REGISTRYINDEX, ObjectInfo^.LuaRef);
+      result := true;
+    end;
 end;
 
 function plua_GetObjectInfo(l : Plua_State; InstanceObject: TObject): PLuaInstanceInfo;

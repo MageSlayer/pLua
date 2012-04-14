@@ -93,7 +93,7 @@ procedure lua_reporterror(l : PLua_State; const ErrMes:string);
 begin
   {$IFDEF LUAJIT}
   //LuaJit wants native exceptions, not longjmp!
-  raise Exception.Create(ErrMes);
+  raise LuaException.Create(ErrMes);
   {$ELSE}
   lua_pushstring(L, PChar(ErrMes));
   lua_error(L); //does longjmp, almost the same as exception raising

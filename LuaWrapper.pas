@@ -65,9 +65,14 @@ type
     procedure Close;
     procedure Open;
 
+    function Owns(Obj:TObject):boolean;
+
     //mark given object as being ready for garbage collection
     function ObjMarkFree(Obj:TObject):boolean;overload;
     procedure ObjMarkFree(const Obj:TObjArray);overload;
+
+    //test internal state (global variable, etc)
+    procedure CheckIntegrity;
 
     procedure GarbageCollect;
 
@@ -98,8 +103,8 @@ type
                                const Args: array of Variant;
                                Results : PVariantArray = nil):Integer;
 
-    procedure ObjArraySet(const varName:String; const A:TObjArray; C: PLuaClassInfo; FreeGC:boolean = False);
-    procedure ObjSet(const varName:String; const O:TObject; C: PLuaClassInfo; FreeGC:boolean = False);
+    procedure ObjArraySet(const varName:String; const A:TObjArray; C: PLuaClassInfo; FreeGC:boolean = False; KeepRef:boolean = True);
+    procedure ObjSet(const varName:String; const O:TObject; C: PLuaClassInfo; FreeGC:boolean = False; KeepRef:boolean = True);
     procedure ObjSetEmpty(const varName:String);
     function  ObjGet(const varName:string):TObject;
 
@@ -576,6 +581,9 @@ begin
   if Result = nil then
     plua_RaiseException(l, StartTop, 'Global Lua VM Self pointer is not registered');
 
+  if Result.ClassType <> TLUA then
+    plua_RaiseException(l, StartTop, 'Global Lua VM Self must be of type %s, but has type %s', [TLUA.ClassName, Result.ClassName]);
+
   plua_CheckStackBalance(l, StartTop);
 end;
 
@@ -609,6 +617,17 @@ begin
     end;
 end;
 
+function TLUA.Owns(Obj: TObject): boolean;
+var info:PLuaInstanceInfo;
+begin
+  Result:=False;
+
+  info:=plua_GetObjectInfo(l, Obj);
+  if info = nil then Exit;
+
+  Result:=info^.OwnsObject;
+end;
+
 function TLUA.ObjMarkFree(Obj: TObject):boolean;
 begin
   Result:=False;
@@ -622,6 +641,12 @@ begin
   if l <> nil then
     for n:=0 to High(Obj) do
       plua_ObjectMarkFree(l, Obj[n]);
+end;
+
+procedure TLUA.CheckIntegrity;
+begin
+  //Lua Self has its own checks
+  LuaSelf(l);
 end;
 
 procedure TLUA.GarbageCollect;
@@ -738,7 +763,7 @@ begin
   end;
 end;
 
-procedure TLUA.ObjArraySet(const varName: String; const A: TObjArray; C: PLuaClassInfo; FreeGC:boolean);
+procedure TLUA.ObjArraySet(const varName: String; const A: TObjArray; C: PLuaClassInfo; FreeGC:boolean; KeepRef:boolean);
 var n, tix:integer;
     StartTop:integer;
 begin
@@ -759,7 +784,7 @@ begin
   for n:=0 to High(A) do
     begin
       lua_pushinteger(L, n+1); // table,key
-      pLuaObject.plua_pushexisting(l, A[n], C, FreeGC);
+      pLuaObject.plua_pushexisting(l, A[n], C, FreeGC, KeepRef);
       lua_settable(L,-3); // table
     end;
   lua_setglobal( L, PChar(varName) );
@@ -768,9 +793,9 @@ begin
 end;
 
 procedure TLUA.ObjSet(const varName: String; const O: TObject;
-  C: PLuaClassInfo; FreeGC: boolean);
+  C: PLuaClassInfo; FreeGC: boolean; KeepRef:boolean);
 begin
-  pLuaObject.plua_pushexisting(l, O, C, FreeGC);
+  pLuaObject.plua_pushexisting(l, O, C, FreeGC, KeepRef);
   lua_setglobal( L, PChar(varName) );
 end;
 
