@@ -129,7 +129,8 @@ procedure plua_releaseClassInfo(var ClassInfoPointer: TLuaClassInfo);overload;
 procedure plua_AddClassProperty( var ClassInfo : TLuaClassInfo;
                                  propertyName : AnsiString;
                                  Reader   : plua_PropertyReader;
-                                 Writer   : plua_PropertyWriter );
+                                 Writer   : plua_PropertyWriter = nil // properties can be read-only
+                                 );
 procedure plua_AddClassMethod( var ClassInfo : TLuaClassInfo;
                                methodName : AnsiString;
                                wrapper : plua_MethodWrapper );
