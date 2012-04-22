@@ -17,6 +17,19 @@ type
   LuaException = class(Exception)
   end;
 
+{$IFDEF LUA_LPEG} // as it links statically, not everybody can need it.
+const
+  {$IFDEF WIN32}
+    LpegLib = 'lpeg.dll'
+  {$ENDIF}
+  {$IFDEF UNIX}
+    LpegLib = 'liblpeg.so'
+  {$ENDIF}
+  ;
+//register Lpeg in Lua instance
+function luaopen_lpeg (L: PLua_State):Integer;cdecl;external LpegLib;
+{$ENDIF}
+
 function  plua_tostring(L: PLua_State; Index: Integer): ansistring;
 procedure plua_pushstring(L: PLua_State; AString : AnsiString);
 
