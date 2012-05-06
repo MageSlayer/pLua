@@ -88,6 +88,7 @@ type
 
     function  ExecuteAsFunctionObj(const FunctionName:string):TObject;
     function  ExecuteAsFunctionObjList(const FunctionName:string):TObjArray;
+    procedure ExecuteAsFunctionStrList(const Script: string; ResultTable: TStrings);
 
     procedure ExecuteCmd(Script:AnsiString);
     procedure ExecuteAsRepl(const Script:String; out ReplResult:string);
@@ -110,6 +111,7 @@ type
 
     procedure GlobalObjClear;
     procedure GlobalVarClear(const varName:string);
+    procedure GlobalObjectNames(List:TStrings; LuaType:Integer);
 
     property ScriptText: AnsiString read FScript write FScript;
     property ScriptFile: AnsiString read FLibFile write FLibFile;
@@ -333,6 +335,43 @@ begin
     end;
 
   plua_CheckStackBalance(l, StartTop);
+end;
+
+procedure TLUA.ExecuteAsFunctionStrList(const Script: string; ResultTable:TStrings) ;
+var Val:PChar;
+    StartTop, idx:integer;
+begin
+  ResultTable.Create;
+  StartTop:=lua_gettop(l);
+
+  try
+    luaL_loadstring(l, PChar(Script));
+    ExecuteScript(LUA_MULTRET);
+    if lua_type(L,-1) = LUA_TTABLE then
+      begin
+        //read table into TString object
+
+        idx:=lua_gettop(l);
+        //table traversal
+        //http://www.lua.org/manual/5.0/manual.html#3.5
+        // table is in the stack at index idx
+        lua_pushnil(L);  // first key
+        while (lua_next(L, idx) <> 0) do
+        begin
+           if lua_type(L, -1) <> LUA_TSTRING then
+             raise LuaException.Create('ExecuteAsFunctionStrList requires to be all table values to be strings');
+
+           // key is at index -2 and value at index -1
+           Val:= lua_tostring(L, -1);
+           if Val <> nil then
+             ResultTable.Add( String(Val) );
+
+           lua_pop(L, 1);  // removes value; keeps key for next iteration
+        end;
+      end;
+  finally
+    plua_EnsureStackBalance(l, StartTop);
+  end;
 end;
 
 procedure TLUA.ExecuteCmd(Script: AnsiString);
@@ -820,6 +859,15 @@ begin
   lua_pushstring(l, PChar(varName));
   lua_pushnil(l);
   lua_settable(L, LUA_GLOBALSINDEX);
+end;
+
+procedure TLUA.GlobalObjectNames(List: TStrings; LuaType: Integer);
+begin
+  List.Clear;
+  if LuaType = LUA_TFUNCTION then
+    begin
+      ExecuteAsFunctionStrList('return lua_info.global_functions()', List);
+    end;
 end;
 
 function TLUA.TableFunctionExists(TableName,
