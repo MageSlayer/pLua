@@ -4,12 +4,14 @@ pLua plus (pLua+)
 Short disclaimer
 ---------------
 
-A fork of a project called pLua previously hosted at http://www.eonclash.com (domain expired as of 14.05.2012)
+A fork of a project called pLua previously hosted at http://www.eonclash.com (domain expired as of 14.05.2012).
 
 Description
 -----------
 
 The project aims at embedding Lua/LuaJit interpreter into FreePascal/Lazarus based projects.
+Original pLua project's sources are located in master branch.
+pLua+ sources are in patches branch.
 
 Differences from original pLua project
 --------------------------------------
