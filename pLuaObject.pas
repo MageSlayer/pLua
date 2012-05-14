@@ -1,15 +1,21 @@
 unit pLuaObject;
 
+{$IFDEF FPC}
 {$mode objfpc}{$H+}
+{$TYPEDADDRESS ON}
+{$ENDIF}
 
 interface
 
 uses
-  Classes, SysUtils, lua, pLua, uWordList;
+  Classes, SysUtils, fgl,
+  lua, pLua, uWordList;
 
 type
   TLuaObjectEventDelegate = class;
   PLuaInstanceInfo = ^TLuaInstanceInfo;
+  PPLuaInstanceInfo = ^PLuaInstanceInfo;
+
   plua_ClassMethodWrapper = function(target : TObject; l : Plua_State; paramidxstart, paramcount : integer) : Integer;
   plua_PropertyReader   = plua_ClassMethodWrapper;
   plua_PropertyWriter   = plua_ClassMethodWrapper;
@@ -30,7 +36,9 @@ type
     wrapper    : plua_MethodWrapper;
   end;
   
+  TLuaClassId = type Pointer; //just a pointer is enough to identify "class-ness"
   TLuaClassInfo = record
+    ClassId     : TLuaClassId;
     Parent      : PLuaClassInfo;
     ClassName   : AnsiString;
     New         : plua_ClassConstructor;
@@ -45,34 +53,44 @@ type
   TLuaInstanceInfo = record
     OwnsObject: Boolean;
     LuaRef    : Integer;
-    ClassInfo : PLuaClassInfo;
+    ClassId   : TLuaClassId;
     l         : PLua_state;
     obj       : TObject;
     Delegate  : TLuaObjectEventDelegate;
   end;
 
+  TClassIdObjMap = specialize TFPGMap<TLuaClassId, PLuaClassInfo>;
+
   { TLuaClassList }
 
   TLuaClassList = class
     fItems : TList;
+
+    //just an index to get PLuaClassInfo by ClassId quickly
+    FClassIdToClassInfo:TClassIdObjMap;
   private
     function GetClassInfo(index : integer): PLuaClassInfo;
+    function GetClassInfoById(Id : TLuaClassId): PLuaClassInfo;
     function GetCount: integer;
+    procedure FreeItem(ci: PLuaClassInfo);
   public
     constructor Create;
     destructor Destroy; override;
 
-    function  GetPropReader(aClassInfo : PLuaClassInfo; aPropertyName : AnsiString) : plua_PropertyReader;
-    function  GetPropWriter(aClassInfo : PLuaClassInfo; aPropertyName : AnsiString; out ReadOnly : Boolean) : plua_PropertyWriter;
+    function  GetPropReader( ClassId : TLuaClassId; const aPropertyName : AnsiString ) : plua_PropertyReader;
+    function  GetPropWriter( ClassId : TLuaClassId; const aPropertyName : AnsiString; out ReadOnly : Boolean ) : plua_PropertyWriter;
 
     function  GetInfo(l : Plua_State; InstanceObject : TObject) : PLuaInstanceInfo;
 
-    function  Add(aClassInfo : TLuaClassInfo) : Integer;
+    //AHTUNG!!! Do not try to use aClassInfo after Add!!!
+    function  Add(aClassInfo : PLuaClassInfo) : Integer;
+
     procedure Remove(aClassName : AnsiString);
     function  IndexOf(aClassName : AnsiString) : Integer;
     procedure Clear;
     property  Count : integer read GetCount;
     property  ClassInfo[index : integer]:PLuaClassInfo read GetClassInfo; default;
+    property  ClassInfoById[Id : TLuaClassId]:PLuaClassInfo read GetClassInfoById;
   end;
 
   { TLuaObjectEventDelegate }
@@ -119,12 +137,11 @@ type
     property Count : Integer read GetCount;
   end;
 
-procedure plua_registerclass( l : PLua_State; const classInfo : TLuaClassInfo);
+procedure plua_registerclass( l : PLua_State; classInfo : PLuaClassInfo);
 procedure plua_newClassInfo( var ClassInfoPointer : PLuaClassInfo);
 procedure plua_initClassInfo( var ClassInfo : TLuaClassInfo);
 
-procedure plua_releaseClassInfo( var ClassInfoPointer : PLuaClassInfo);overload;
-procedure plua_releaseClassInfo(var ClassInfoPointer: TLuaClassInfo);overload;
+procedure plua_releaseClassInfo( var ClassInfoPointer : PLuaClassInfo);
 
 procedure plua_AddClassProperty( var ClassInfo : TLuaClassInfo;
                                  propertyName : AnsiString;
@@ -144,12 +161,12 @@ function plua_getObjectInfo( l : PLua_State; idx : Integer) : PLuaInstanceInfo;
 
 function plua_registerExisting( l : PLua_State; InstanceName : AnsiString;
                                 ObjectInstance : TObject;
-                                classInfo : PLuaClassInfo;
+                                classId : TLuaClassId;
                                 FreeOnGC : Boolean = false; KeepRef:boolean = True) : PLuaInstanceInfo;
 //Function pushes an object into stack.
 function plua_pushexisting( l : PLua_State;
                             ObjectInstance : TObject;
-                            classInfo : PLuaClassInfo;
+                            classId : TLuaClassId;
                             FreeOnGC : Boolean = false; //Call native destructor on garbage collecting?
                             KeepRef:boolean = True //Reference keeps garbage collector from freeing object, until application decides to release it.
                                                    //If KeepRef is true, then application itself is responsible for freeing Lua object using pLua_ObjectMarkFree
@@ -161,13 +178,16 @@ function plua_pushexisting( l : PLua_State;
 //Chicken/egg problem avoidance.
 function plua_pushexisting_special( l : PLua_State;
                             ObjectInstance : TObject;
-                            classInfo: PLuaClassInfo; //Important!!! Can be nil here!
+                            classId: TLuaClassId; //Important!!! Can be nil here!
                             FreeOnGC : Boolean = false;  //Call native destructor on garbage collecting?
                             KeepRef:boolean = True //Reference keeps garbage collector from freeing object, until application decides to release it.
                                                    //If KeepRef is true, then application itself is responsible for freeing Lua object using pLua_ObjectMarkFree
                             ) : PLuaInstanceInfo;
+// only for freeing instances made by plua_pushexisting_special!
+procedure plua_instance_free(l: Plua_State; var Instance: PLuaInstanceInfo);
 
 function plua_ObjectMarkFree(l: Plua_State; ObjectInstance: TObject):boolean;
+function plua_ref_release(l : PLua_State; obj:PLuaInstanceInfo):boolean;overload;
 
 function  plua_PushObject(ObjectInfo : PLuaInstanceInfo) : Boolean;
 function  plua_GetObjectInfo(l : Plua_State; InstanceObject : TObject) : PLuaInstanceInfo;
@@ -178,15 +198,11 @@ function  plua_CallObjectEvent( ObjectInfo : PLuaInstanceInfo;
                                 const Args: array of Variant;
                                 Results : PVariantArray = nil):Integer;
 
-procedure plua_ClearObjects(L : PLua_State; LeakWarnings:boolean);
 function plua_AllocatedObjCount(L : PLua_State):Integer;
 
 implementation
 uses
   typinfo, LuaWrapper;
-
-type
-  PObject = ^TObject;
 
 function  plua_GetEventDeletage(S: TLuaInternalState; Obj : TObject ) : TLuaObjectEventDelegate;forward;
 
@@ -263,7 +279,7 @@ begin
   //remove parameters from stack
   lua_pop(l, 2);
 
-  reader := LuaSelf(l).LuaClasses.GetPropReader(cInfo^.ClassInfo, propName);
+  reader := LuaSelf(l).LuaClasses.GetPropReader(cInfo^.ClassId, propName);
   if assigned(reader) then
     result := reader(obj, l, propValueStart, pcount)
   else
@@ -304,7 +320,7 @@ begin
   //remove parameters from stack
   lua_pop(l, 2);
 
-  writer := LuaSelf(l).LuaClasses.GetPropWriter(cInfo^.ClassInfo, propName, bReadOnly);
+  writer := LuaSelf(l).LuaClasses.GetPropWriter(cInfo^.ClassId, propName, bReadOnly);
   if assigned(writer) then
     result := writer(obj, l, propValueStart, pcount)
   else
@@ -336,13 +352,12 @@ end;
 
 function plua_new_class(l : PLua_State) : integer; cdecl;
 var
-  i, n, tidx, midx, classID,
-  oidx    : Integer;
-  classPTR: Pointer;
+  i, n, tidx, midx, oidx : Integer;
+  classId : TLuaClassId;
   cInfo   : PLuaClassInfo;
   instance: PLuaInstanceInfo;
   pcount  : integer;
-  obj_user: PObject;
+  obj_user: PPLuaInstanceInfo;
 begin
   pcount := lua_gettop(l);
   result := 0;
@@ -352,15 +367,16 @@ begin
 
   tidx := 1;
 
-  lua_pushstring(l, '__classPTR');
+  lua_pushstring(l, '__ClassId');
   lua_rawget(l, tidx);
-  classPTR := pointer(PtrInt(lua_tointeger(l, -1)));
-  cInfo := PLuaClassInfo(classPTR);
+  classId := lua_touserdata(l, -1);
   lua_pop(l, 1);
+
+  cInfo := LuaSelf(l).LuaClasses.ClassInfoById[ classId ];
 
   instance:=plua_instance_new;
   instance^.OwnsObject := true;
-  instance^.ClassInfo := cInfo;
+  instance^.ClassId := classId;
   instance^.l := l;
   if cInfo^.New <> nil then
     instance^.obj := cInfo^.New(l, 2, pcount, instance)
@@ -371,8 +387,8 @@ begin
 
   instance^.LuaRef := luaL_ref(L, LUA_REGISTRYINDEX);
 
-  obj_user:=lua_newuserdata(L, sizeof(PObject));
-  obj_user^:=TObject(instance);
+  obj_user:=lua_newuserdata(L, sizeof(instance));
+  obj_user^:=instance;
 
   luaL_getmetatable(l, PChar(ClassMetaTableName(cinfo)) );
   lua_setmetatable(l, -2);
@@ -405,42 +421,48 @@ begin
   //plua_ref_release(l, ref);
 end;
 
-procedure plua_registerclass(l: PLua_State; const classInfo: TLuaClassInfo);
+procedure plua_registerclass(l: PLua_State; classInfo: PLuaClassInfo);
 var midx, StartTop, i, err : integer;
     registered:boolean;
     ClassMetaTable, ProcsMetaTable, PropsMetaTable, FuncCode:string;
     S:TLuaInternalState;
 begin
-  LogDebug('Registering class %s.', [classInfo.ClassName]);
+  LogDebug('Registering class %s.', [classInfo^.ClassName]);
 
   StartTop := lua_gettop(l);
 
   //already registered?
-  ClassMetaTable:=ClassMetaTableName(@classInfo);
+  ClassMetaTable:=ClassMetaTableName(classInfo);
   luaL_getmetatable(l, PChar(ClassMetaTable) );
   if lua_istable(l, -1) then
     begin
       plua_EnsureStackBalance(l, StartTop);
+      plua_releaseClassInfo(classInfo);
       Exit;
     end;
   lua_pop(l, 1);
 
   S:=LuaSelf(l);
   //skip re-registering classes.
-  if S.LuaClasses.IndexOf( classinfo.ClassName ) = -1 then
+  if S.LuaClasses.IndexOf( classinfo^.ClassName ) <> -1 then
     begin
-      S.LuaClasses.Add(classInfo);
+      LogDebug('Skipping registering class %s. Already registered', [classInfo^.ClassName]);
+
+      plua_releaseClassInfo(classInfo);
+      Exit;
     end;
 
-  plua_pushstring(l, classInfo.ClassName);
+  S.LuaClasses.Add(classInfo);
+
+  plua_pushstring(l, classInfo^.ClassName);
   lua_newtable(l);
 
-  ProcsMetaTable:=ClassProcsMetaTableName(@classInfo);
-  PropsMetaTable:=ClassPropsMetaTableName(@classInfo);
+  ProcsMetaTable:=ClassProcsMetaTableName(classInfo);
+  PropsMetaTable:=ClassPropsMetaTableName(classInfo);
 
   if luaL_newmetatable(l, PChar(ClassMetaTable) ) <> 1 then
     begin
-      plua_RaiseException(l, StartTop, 'Cannot create metatable for class %s', [classInfo.ClassName]);
+      plua_RaiseException(l, StartTop, 'Cannot create metatable for class %s', [classInfo^.ClassName]);
     end;
 
   lua_setmetatable(l, -2);
@@ -502,15 +524,15 @@ begin
   midx := lua_gettop(l);
 
   //populate class methods metatable
-  if Length(classInfo.Methods) > 0 then
+  if Length(classInfo^.Methods) > 0 then
       begin
         LogDebug('Registering class methods.');
         // TODO - Add parent method calls in
-        for i := 0 to High(classInfo.Methods) do
+        for i := 0 to High(classInfo^.Methods) do
           begin
-            LogDebug('Registering class method %s.', [classInfo.Methods[i].MethodName]);
-            plua_pushstring(L, classInfo.Methods[i].MethodName);
-            lua_pushinteger(l, PtrInt(classInfo.Methods[i].wrapper));
+            LogDebug('Registering class method %s.', [classInfo^.Methods[i].MethodName]);
+            plua_pushstring(L, classInfo^.Methods[i].MethodName);
+            lua_pushinteger(l, PtrInt(classInfo^.Methods[i].wrapper));
             lua_pushcclosure(L, @plua_call_class_method, 1);
             lua_rawset(l, midx);
           end;
@@ -521,6 +543,10 @@ begin
   //populate main class metatable
   luaL_getmetatable(l, PChar(ClassMetaTable) );
   midx := lua_gettop(l);
+
+  lua_pushstring(L, '__ClassId');
+  lua_pushlightuserdata(L, classInfo^.ClassId);
+  lua_rawset(L, midx);
 
   lua_pushstring(L, '__call');
   lua_pushcfunction(L, @plua_new_class);
@@ -543,7 +569,7 @@ begin
            '%mt_props%', PropsMetaTable]);
   if err <> 0 then
     begin
-      plua_RaiseException(l, StartTop, 'Cannot compile __index function for class %s metatable', [classInfo.ClassName]);
+      plua_RaiseException(l, StartTop, 'Cannot compile __index function for class %s metatable', [classInfo^.ClassName]);
     end;
   lua_rawset(L, midx);
 
@@ -555,7 +581,7 @@ begin
         ['%mt_props%', PropsMetaTable]);
   if err <> 0 then
     begin
-      plua_RaiseException(l, StartTop, 'Cannot compile __newindex function for class %s metatable', [classInfo.ClassName]);
+      plua_RaiseException(l, StartTop, 'Cannot compile __newindex function for class %s metatable', [classInfo^.ClassName]);
     end;
   lua_rawset(L, midx);
 
@@ -569,8 +595,7 @@ end;
 
 procedure plua_newClassInfo(var ClassInfoPointer: PLuaClassInfo);
 begin
-  if ClassInfoPointer = nil then
-    new(ClassInfoPointer);
+  new(ClassInfoPointer);
   plua_initClassInfo(ClassInfoPointer^);
 end;
 
@@ -589,18 +614,14 @@ end;
 
 procedure plua_releaseClassInfo(var ClassInfoPointer: PLuaClassInfo);
 begin
-  plua_releaseClassInfo( ClassInfoPointer^ );
+  Finalize(ClassInfoPointer^.Properties);
+  Finalize(ClassInfoPointer^.Methods);
+
+  ClassInfoPointer^.PropHandlers.Free;
+  ClassInfoPointer^.PropHandlers:=nil;
 
   Freemem(ClassInfoPointer);
   ClassInfoPointer:=nil;
-end;
-
-procedure plua_releaseClassInfo(var ClassInfoPointer: TLuaClassInfo);
-begin
-  Finalize(ClassInfoPointer.Properties);
-
-  ClassInfoPointer.PropHandlers.Free;
-  ClassInfoPointer.PropHandlers:=nil;
 end;
 
 procedure plua_AddClassProperty(var ClassInfo: TLuaClassInfo;
@@ -630,20 +651,24 @@ end;
 
 function plua_getObject(l: PLua_State; idx: Integer; PopValue:boolean): TObject;
 var
-  obj_user:PObject;
+  obj_user:PPLuaInstanceInfo;
   instance : PLuaInstanceInfo;
 begin
   result := nil;
   instance:=nil;
 
-  obj_user:= lua_touserdata(L, idx);
-  if obj_user <> nil then
-    instance := PLuaInstanceInfo(obj_user^);
+  try
+    if not lua_isuserdata(l, idx) then Exit;
 
-  if PopValue then
-    lua_pop(l, 1);
-  if assigned(instance) and assigned(instance^.obj) then
-    result := instance^.obj;
+    obj_user:= lua_touserdata(L, idx);
+    if obj_user <> nil then
+      instance := obj_user^;
+  finally
+    if PopValue then
+      lua_pop(l, 1);
+    if assigned(instance) and assigned(instance^.obj) then
+      result := instance^.obj;
+  end;
 end;
 
 function plua_GlobalObjectGet(l: PLua_State; const varName: string): TObject;
@@ -669,7 +694,7 @@ end;
 function plua_getObjectTable(l: PLua_State; idx: Integer; PopValue: boolean
   ): TObjArray;
 var
-  obj_user:PObject;
+  obj_user:PPLuaInstanceInfo;
   instance : PLuaInstanceInfo;
   C:Integer;
 begin
@@ -686,7 +711,7 @@ begin
      obj_user:= lua_touserdata(L, -1);
      if obj_user <> nil then
        begin
-         instance := PLuaInstanceInfo(obj_user^);
+         instance := obj_user^;
          if assigned(instance) and assigned(instance^.obj) then
            begin
              Inc(C);
@@ -707,31 +732,39 @@ begin
 end;
 
 function plua_getObjectInfo(l: PLua_State; idx: Integer): PLuaInstanceInfo;
-var obj_user:PObject;
+var obj_user:PPLuaInstanceInfo;
+    i:Integer;
 begin
   result := nil;
 
-  obj_user:=lua_touserdata(l, plua_absindex(l, idx));
-  if obj_user <> nil then
-     Result:=PLuaInstanceInfo(obj_user^);
+  try
+    i:=plua_absindex(l, idx);
+    if not lua_isuserdata(l, i) then Exit;
 
-  if lua_gettop(l) = idx then //злобный хак! Чтобы отказаться от него нужно потратить кучу времени на тестирование всего от него зависящего!
-    lua_pop(l, 1);
+    obj_user:=lua_touserdata(l, i);
+    if obj_user <> nil then
+       Result:=obj_user^;
+  finally
+    if lua_gettop(l) = idx then //злобный хак! Чтобы отказаться от него нужно потратить кучу времени на тестирование всего от него зависящего!
+      lua_pop(l, 1);
+  end;
 end;
 
 function plua_registerExisting(l: PLua_State; InstanceName: AnsiString;
-  ObjectInstance: TObject; classInfo: PLuaClassInfo;
+  ObjectInstance: TObject; classId: TLuaClassId;
   FreeOnGC : Boolean; KeepRef:boolean) : PLuaInstanceInfo;
 begin
   plua_pushstring(l, InstanceName);
-  Result:=plua_pushexisting(l, ObjectInstance, classInfo, FreeOnGC, KeepRef);
+  Result:=plua_pushexisting(l, ObjectInstance, classId, FreeOnGC, KeepRef);
   lua_settable(l, LUA_GLOBALSINDEX );
 end;
 
 function plua_pushexisting(l: PLua_State; ObjectInstance: TObject;
-  classInfo: PLuaClassInfo; FreeOnGC: Boolean; KeepRef:boolean): PLuaInstanceInfo;
+  classId: TLuaClassId; FreeOnGC: Boolean; KeepRef:boolean): PLuaInstanceInfo;
 var
   StartTop : Integer;
+  classinfo: PLuaClassInfo;
+  Lua:TLuaInternalState;
 begin
   StartTop:=lua_gettop(l);
 
@@ -746,8 +779,12 @@ begin
     begin
       LogDebug('plua_pushexisting. Object $%x', [PtrInt(ObjectInstance)]);
 
-      Result:=plua_pushexisting_special(l, ObjectInstance, classInfo, FreeOnGC, KeepRef);
-      LuaObjects_Add( LuaSelf(l), Result );
+      Lua:=LuaSelf(l);
+
+      Result:=plua_pushexisting_special(l, ObjectInstance, classId, FreeOnGC, KeepRef);
+      LuaObjects_Add( Lua, Result );
+
+      classinfo:=Lua.LuaClasses.ClassInfoById[ classId ];
 
       //assign metatable to simulate "classness"
       luaL_getmetatable(l, PChar(ClassMetaTableName(classInfo)) );
@@ -756,18 +793,21 @@ begin
   plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
 end;
 
-function plua_pushexisting_special(l: PLua_State; ObjectInstance: TObject; classInfo: PLuaClassInfo; FreeOnGC: Boolean;
+function plua_pushexisting_special(l: PLua_State; ObjectInstance: TObject; classId: TLuaClassId; FreeOnGC: Boolean;
   KeepRef: boolean): PLuaInstanceInfo;
-var obj_user:PObject;
+var obj_user:PPLuaInstanceInfo;
+    StartTop : Integer;
 begin
+  StartTop:=lua_gettop(l);
+
   Result:=plua_instance_new;
   Result^.OwnsObject := FreeOnGC;
-  Result^.ClassInfo := classInfo;
+  Result^.ClassId := classId;
   Result^.l := l;
   Result^.obj := ObjectInstance;
 
-  obj_user:=lua_newuserdata(L, sizeof(PObject));
-  obj_user^:=TObject(Result);
+  obj_user:=lua_newuserdata(L, sizeof(obj_user^));
+  obj_user^:=Result;
 
   if not KeepRef then
     Result^.LuaRef:=LUA_NOREF
@@ -778,6 +818,18 @@ begin
     end;
 
   LogDebug('plua_pushexisting. Object $%x. LuaRef=%d', [ PtrInt(ObjectInstance), Result^.LuaRef ]);
+
+  plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
+end;
+
+procedure plua_instance_free(l: Plua_State; var Instance: PLuaInstanceInfo);
+begin
+  //remove reference
+  if l <> nil then
+    plua_ref_release(l, Instance);
+
+  Dispose(Instance);
+  Instance:=nil;
 end;
 
 function plua_ObjectMarkFree(l: Plua_State; ObjectInstance: TObject):boolean;
@@ -852,41 +904,16 @@ begin
     end;
 end;
 
-procedure plua_ClearObjects(L: PLua_State; LeakWarnings:boolean);
-var
-  i   : Integer;
-  nfo : PLuaInstanceInfo;
-  S:TLuaInternalState;
-begin
-  S:=LuaSelf(l);
-
-  i := S.LuaObjects.Count-1;
-  while i > -1 do
-    begin
-      nfo := PLuaInstanceInfo(S.LuaObjects[i]);
-      if nfo^.l = l then
-        begin
-          if LeakWarnings then
-            begin
-              if nfo^.LuaRef <> LUA_NOREF then
-                 LogDebug('Lua object $%x (%s) has lua ref (%d) unfreed.',
-                          [ PtrInt(nfo^.obj), nfo^.obj.ClassName, nfo^.LuaRef ]);
-
-              LogDebug('Lua object $%x (%s) memory leak. Freeing...', [ PtrInt(nfo^.obj), nfo^.obj.ClassName ]);
-            end;
-
-          plua_ref_release( l, nfo );
-          LuaObjects_Free( S, nfo );
-        end;
-      dec(i);
-    end;
-end;
-
 { TLuaClassList }
 
 function TLuaClassList.GetClassInfo(index : integer): PLuaClassInfo;
 begin
   result := PLuaClassInfo(fItems[index]);
+end;
+
+function TLuaClassList.GetClassInfoById(Id : TLuaClassId): PLuaClassInfo;
+begin
+  Result:=FClassIdToClassInfo.KeyData[Id];
 end;
 
 function TLuaClassList.GetCount: integer;
@@ -897,21 +924,26 @@ end;
 constructor TLuaClassList.Create;
 begin
   fItems := TList.Create;
+  FClassIdToClassInfo:=TClassIdObjMap.Create;
+  FClassIdToClassInfo.Sorted:=True;
 end;
 
 destructor TLuaClassList.Destroy;
 begin
   Clear;
   fItems.Free;
+  FClassIdToClassInfo.Free;
   inherited Destroy;
 end;
 
-function TLuaClassList.GetPropReader(aClassInfo: PLuaClassInfo;
-  aPropertyName: AnsiString): plua_PropertyReader;
+function TLuaClassList.GetPropReader(ClassId : TLuaClassId; const aPropertyName : AnsiString): plua_PropertyReader;
 var
   pi : PtrInt;
   ei : PWordListSymbol;
+  aClassInfo: PLuaClassInfo;
 begin
+  aClassInfo:=ClassInfoById[ ClassId ];
+
 // TODO - Add parent property calls in
   result := nil;
   ei := aClassInfo^.PropHandlers.WordSymbol[aPropertyName];
@@ -926,13 +958,15 @@ begin
     result := aClassInfo^.Properties[pi].Reader;
 end;
 
-function TLuaClassList.GetPropWriter(aClassInfo: PLuaClassInfo;
-  aPropertyName: AnsiString; out ReadOnly : Boolean): plua_PropertyWriter;
+function TLuaClassList.GetPropWriter(ClassId : TLuaClassId; const aPropertyName : AnsiString; out ReadOnly : Boolean): plua_PropertyWriter;
 var
   pi : PtrInt;
   ei : PWordListSymbol;
+  aClassInfo: PLuaClassInfo;
 begin
-// TODO - Add parent property calls in
+  aClassInfo:=ClassInfoById[ ClassId ];
+
+  // TODO - Add parent property calls in
   ReadOnly := false;
   result := nil;
   ei := aClassInfo^.PropHandlers.WordSymbol[aPropertyName];
@@ -981,19 +1015,41 @@ begin
   }
 end;
 
-function TLuaClassList.Add(aClassInfo: TLuaClassInfo) : Integer;
+function TLuaClassList.Add(aClassInfo: PLuaClassInfo) : Integer;
+{
 var
   ci  : PLuaClassInfo;
+  }
 begin
-  result := IndexOf(aClassInfo.ClassName);
+  result := IndexOf(aClassInfo^.ClassName);
+  {
   if result = -1 then
     begin
       new(ci);
+
       result := fItems.Add(ci);
     end
   else
     ci := ClassInfo[result];
-  ci^ := aClassInfo;
+  ci^:= aClassInfo;
+  }
+  if result <> -1 then
+    begin
+      FreeItem( ClassInfo[result] );
+      fItems[Result]:=aClassInfo;
+    end
+    else
+    begin
+      result := fItems.Add(aClassInfo);
+    end;
+
+  FClassIdToClassInfo.Add( aClassInfo^.ClassId, aClassInfo );
+end;
+
+procedure TLuaClassList.FreeItem(ci : PLuaClassInfo);
+begin
+  FClassIdToClassInfo.Remove( ci^.ClassId );
+  plua_releaseClassInfo(ci);
 end;
 
 procedure TLuaClassList.Remove(aClassName: AnsiString);
@@ -1005,7 +1061,7 @@ begin
   if idx > -1 then
     begin
       ci := ClassInfo[idx];
-      plua_releaseClassInfo(ci);
+      FreeItem(ci);
       fItems.Delete(idx);
     end;
 end;
@@ -1028,16 +1084,14 @@ procedure TLuaClassList.Clear;
 var
   ci : PLuaClassInfo;
 begin
+  FClassIdToClassInfo.Clear;
   while count > 0 do
     begin
       ci := ClassInfo[count-1];
-      plua_releaseClassInfo(ci);
+      FreeItem(ci);
       fItems.Delete(count-1);
     end;
 end;
-
-var
-  instance : PLuaInstanceInfo;
 
 { TLuaObjectEventDelegate }
 
@@ -1151,7 +1205,7 @@ var
   i : Integer;
 begin
   for i := 0 to Count-1 do
-    plua_registerclass(l, IndexedItem[i]^);
+    plua_registerclass(l, IndexedItem[i]);
 end;
 
 end.

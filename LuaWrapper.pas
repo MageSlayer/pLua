@@ -4,6 +4,7 @@ interface
 
 {$IFDEF FPC}
 {$mode objfpc}{$H+}
+{$TYPEDADDRESS ON}
 {$ENDIF}
 
 {$DEFINE TLuaAsComponent}
@@ -43,6 +44,10 @@ type
     FClassTypesList : TLuaClassTypesList;
     FRecordTypesList : TLuaRecordTypesList;
 
+    FLuaSelf : PLuaInstanceInfo;
+
+    procedure ClearObjects(LeakWarnings: boolean);
+    procedure ClearRecords;
     function  GetLuaCPath: AnsiString;
     function  GetLuaPath: AnsiString;
     function  GetValue(valName : AnsiString): Variant;
@@ -104,8 +109,8 @@ type
                                const Args: array of Variant;
                                Results : PVariantArray = nil):Integer;
 
-    procedure ObjArraySet(const varName:String; const A:TObjArray; C: PLuaClassInfo; FreeGC:boolean = False; KeepRef:boolean = True);
-    procedure ObjSet(const varName:String; const O:TObject; C: PLuaClassInfo; FreeGC:boolean = False; KeepRef:boolean = True);
+    procedure ObjArraySet(const varName:String; const A:TObjArray; C: TLuaClassId; FreeGC:boolean = False; KeepRef:boolean = True);
+    procedure ObjSet(const varName:String; const O:TObject; C: TLuaClassId; FreeGC:boolean = False; KeepRef:boolean = True);
     procedure ObjSetEmpty(const varName:String);
     function  ObjGet(const varName:string):TObject;
 
@@ -188,6 +193,7 @@ type
   function LuaSelf(L : PLua_State):TLuaInternalState;
   procedure LuaObjects_Free(S:TLuaInternalState; instance:PLuaInstanceInfo);
   procedure LuaObjects_Add(S:TLuaInternalState; instance:PLuaInstanceInfo);
+  procedure LuaRecs_Free(S:TLuaInternalState; instance:PLuaRecordInstanceInfo);
 
 implementation
 
@@ -222,35 +228,60 @@ begin
 end;
 {$ENDIF}
 
+procedure TLUA.ClearObjects(LeakWarnings:boolean);
+// Frees/unregistered manually-tracked objects
+var
+  i   : Integer;
+  nfo : PLuaInstanceInfo;
+begin
+  if FLuaObjects.Count > 0 then
+    Log('Warning!!! %d objects left unfreed.', [FLuaObjects.Count]);
+
+  i := FLuaObjects.Count-1;
+  while i > -1 do
+    begin
+      nfo := PLuaInstanceInfo(FLuaObjects[i]);
+      if nfo^.l = l then
+        begin
+          if LeakWarnings then
+            begin
+              if nfo^.LuaRef <> LUA_NOREF then
+                 LogDebug('Lua object $%x (%s) has lua ref (%d) unfreed.',
+                          [ PtrInt(nfo^.obj), nfo^.obj.ClassName, nfo^.LuaRef ]);
+
+              LogDebug('Lua object $%x (%s) memory leak. Freeing...', [ PtrInt(nfo^.obj), nfo^.obj.ClassName ]);
+            end;
+
+          plua_ref_release( l, nfo );
+          LuaObjects_Free( TLuaInternalState(Self), nfo );
+        end;
+      dec(i);
+    end;
+end;
+
+procedure TLUA.ClearRecords;
+var
+  i   : Integer;
+  nfo : PLuaRecordInstanceInfo;
+begin
+  i := FintLuaRecords.Count-1;
+  while i > -1 do
+    begin
+      nfo := PLuaRecordInstanceInfo(FintLuaRecords[i]);
+      if nfo^.l = l then
+        FintLuaRecords.Remove(nfo);
+      dec(i);
+    end;
+end;
+
 destructor TLUA.Destroy;
 var instance:PLuaInstanceInfo;
     rec_instance:PLuaRecordInstanceInfo;
 begin
   Close;
   FMethods.Free;
-
-  if FLuaObjects.Count > 0 then
-    Log('Warning!!! %d objects left unfreed.', [FLuaObjects.Count]);
-
-  while FLuaObjects.Count > 0 do
-    begin
-      instance := PLuaInstanceInfo(FLuaObjects[FLuaObjects.Count-1]);
-      Log('Freeing class "%s" instance.', [instance^.obj.ClassName]);
-
-      LuaObjects_Free(TLuaInternalState(Self), instance);
-    end;
   FreeAndNil(FLuaObjects);
   FreeAndNil(FLuaClasses);
-
-  while FintLuaRecords.Count > 0 do
-    begin
-      rec_instance := PLuaRecordInstanceInfo(FintLuaRecords[FintLuaRecords.Count-1]);
-      FintLuaRecords.Delete(FintLuaRecords.Count-1);
-      if rec_instance^.OwnsInstance then
-        rec_instance^.RecordInfo^.Release(rec_instance, nil);
-      Freemem(rec_instance);
-    end;
-
   FreeAndNil(FintLuaRecords);
 
   FreeAndNil(FLuaDelegates);
@@ -588,9 +619,14 @@ procedure TLUA.Close;
 begin
   if L <> nil then
     begin
-      plua_ClearObjects(L, True);
-      plua_ClearRecords(L);
+      ClearObjects(True);
+      ClearRecords;
       lua_close(L);
+
+      if FLuaSelf <> nil then
+        begin
+          plua_instance_free(nil, FLuaSelf);
+        end;
     end;
   L := nil;
 
@@ -606,7 +642,7 @@ begin
   OpenLibs;
 
   //Register self in Lua VM to be able call from Lua code/native handlers
-  plua_pushexisting_special(l, Self, nil, False);
+  FLuaSelf:=plua_pushexisting_special(l, Self, nil, False);
   lua_setglobal( L, PChar(Lua_Self) );
 end;
 
@@ -634,16 +670,31 @@ begin
   {$ENDIF}
 end;
 
+procedure LuaRecs_Free(S: TLuaInternalState; instance: PLuaRecordInstanceInfo);
+var i:integer;
+    C:PLuaClassInfo;
+    RecInfo:PLuaRecordInfo;
+begin
+  if instance^.OwnsInstance then
+    begin
+      RecInfo:=S.LuaRecords.RecInfoById[ instance^.RecordId ];
+      RecInfo^.Release(instance, nil);
+    end;
+  Freemem(instance);
+end;
+
 procedure LuaObjects_Free(S:TLuaInternalState; instance:PLuaInstanceInfo);
 var i:integer;
+    C:PLuaClassInfo;
 begin
   i:=S.LuaObjects.IndexOf(instance);
   if i <> -1 then
     begin
       if instance^.OwnsObject then
         begin
-          if assigned(instance^.ClassInfo^.Release) then
-            instance^.ClassInfo^.Release(instance^.obj, nil)
+          C:= S.LuaClasses.ClassInfoById[ instance^.ClassId ];
+          if assigned(C^.Release) then
+            C^.Release(instance^.obj, nil)
           else
             instance^.obj.Free;
         end;
@@ -802,7 +853,7 @@ begin
   end;
 end;
 
-procedure TLUA.ObjArraySet(const varName: String; const A: TObjArray; C: PLuaClassInfo; FreeGC:boolean; KeepRef:boolean);
+procedure TLUA.ObjArraySet(const varName: String; const A: TObjArray; C: TLuaClassId; FreeGC:boolean; KeepRef:boolean);
 var n, tix:integer;
     StartTop:integer;
 begin
@@ -832,7 +883,7 @@ begin
 end;
 
 procedure TLUA.ObjSet(const varName: String; const O: TObject;
-  C: PLuaClassInfo; FreeGC: boolean; KeepRef:boolean);
+  C: TLuaClassId; FreeGC: boolean; KeepRef:boolean);
 begin
   pLuaObject.plua_pushexisting(l, O, C, FreeGC, KeepRef);
   lua_setglobal( L, PChar(varName) );
@@ -851,7 +902,7 @@ end;
 
 procedure TLUA.GlobalObjClear;
 begin
-  plua_ClearObjects(l, False);
+  ClearObjects(False);
 end;
 
 procedure TLUA.GlobalVarClear(const varName: string);

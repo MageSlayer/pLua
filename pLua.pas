@@ -97,6 +97,10 @@ procedure DumpStackTrace;
 procedure LogDebug(const TextFmt:string; Args:array of const);inline;overload;
 procedure LogDebug(const Text:string);inline;overload;
 
+//lua stack logging
+procedure lua_logstacktypes(const LogPrefix:string; L: PLua_State);
+procedure lua_logstack(const LogPrefix: string; L: PLua_State);
+
 implementation
 
 uses
@@ -532,6 +536,36 @@ begin
   {$ENDIF}
 end;
 
+procedure lua_logstacktypes(const LogPrefix:string; L: PLua_State);
+var n:Integer;
+begin
+  for n:=1 to lua_gettop(l) do
+    begin
+      Log(Format('%s [%d] - %s', [LogPrefix, n, plua_typename(l, lua_type(l, n))]) );
+    end;
+end;
+
+procedure lua_logstack(const LogPrefix: string; L: PLua_State);
+var n:Integer;
+    val:string;
+    luat:Integer;
+begin
+  Log(Format('%s top=%d', [LogPrefix, lua_gettop(l)]) );
+  for n:=1 to lua_gettop(l) do
+    begin
+      luat:=lua_type(l, n);
+      case luat of
+         LUA_TNIL:       val:='nil';
+         LUA_TBOOLEAN:   val:=BoolToStr(lua_toboolean(l, n), true);
+         LUA_TNUMBER:    val:=FloatToStr(lua_tonumber(l, n));
+         LUA_TSTRING:    val:=lua_tostring(l, n);
+       else
+         val:='()';
+      end;
+
+      Log(Format('%s [%d] - value:%s, type:%s', [LogPrefix, n, val, plua_typename(l, luat)]) );
+    end;
+end;
 
 end.
 
