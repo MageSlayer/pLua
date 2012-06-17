@@ -317,9 +317,6 @@ begin
   propName := plua_tostring(l, 2);
   propValueStart := 3;
 
-  //remove parameters from stack
-  lua_pop(l, 2);
-
   writer := LuaSelf(l).LuaClasses.GetPropWriter(cInfo^.ClassId, propName, bReadOnly);
   if assigned(writer) then
     result := writer(obj, l, propValueStart, pcount)
@@ -332,6 +329,9 @@ begin
           lua_rawset(l, 1);
         end;
     end;
+
+  //remove parameters from stack
+  lua_pop(l, 2);
 end;
 
 function plua_call_class_method(l : PLua_State) : integer; cdecl;
