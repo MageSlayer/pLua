@@ -198,6 +198,9 @@ const
   LUA_TFUNCTION      = 6;
   LUA_TUSERDATA	     = 7;
   LUA_TTHREAD        = 8;
+  {$IFDEF LUAJIT}
+  LUA_TCDATA         = 10;
+  {$ENDIF}
 
   (* minimum Lua stack available to a C function *)
   LUA_MINSTACK = 20;

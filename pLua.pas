@@ -2,6 +2,7 @@ unit pLua;
 
 {$IFDEF FPC}
 {$mode objfpc}{$H+}
+{$modeswitch nestedprocvars}
 {$ENDIF}
 
 interface
@@ -40,11 +41,14 @@ procedure plua_RegisterLuaTable( l:PLua_State; Name : AnsiString;
 
 function plua_functionexists( L: PLua_State; FunctionName : AnsiString;
                               TableIndex : Integer = LUA_GLOBALSINDEX) : boolean;
-                            
+
+type
+  TLuaParamPushProc = function (L:Plua_State):Integer is nested;
 function plua_callfunction( L: PLua_State; FunctionName : AnsiString;
                             const args : Array of Variant;
                             results : PVariantArray = nil;
-                            TableIndex : Integer = LUA_GLOBALSINDEX) : Integer;
+                            TableIndex : Integer = LUA_GLOBALSINDEX;
+                            ParamsToPush:TLuaParamPushProc = nil) : Integer;
 
 procedure plua_pushvariant( L : PLua_State; v : Variant);
 
@@ -174,8 +178,9 @@ end;
 
 function plua_callfunction( L: PLua_State; FunctionName : AnsiString;
                             const args : Array of Variant;
-                            results : PVariantArray = nil;
-                            TableIndex : Integer = LUA_GLOBALSINDEX) : Integer;
+                            results : PVariantArray;
+                            TableIndex : Integer;
+                            ParamsToPush:TLuaParamPushProc) : Integer;
 var
    NArgs, offset,
    i :Integer;
@@ -184,9 +189,19 @@ begin
   offset := lua_gettop(l);
   plua_pushstring(L, FunctionName);
   lua_rawget(L, TableIndex);
-  NArgs := High(Args);
-  for i:=0 to NArgs do
-    plua_pushvariant(l, args[i]);
+  if lua_isnil(L, -1) then
+    raise LuaException.CreateFmt('Function %s not found', [FunctionName]);
+
+  if @ParamsToPush <> nil then
+    begin
+      NArgs:=ParamsToPush(l) - 1;
+    end
+    else
+    begin
+      NArgs := High(Args);
+      for i:=0 to NArgs do
+        plua_pushvariant(l, args[i]);
+    end;
   if lua_pcall(l, NArgs+1, LUA_MULTRET, 0) <> 0 then
     begin
       msg := plua_tostring(l, -1);
