@@ -344,7 +344,7 @@ begin
   pcount := lua_gettop(l);
   result := 0;
   obj := plua_getObject(l, 1, False);
-  method := plua_MethodWrapper(PtrInt(lua_tointeger(l, lua_upvalueindex(1))));
+  method := plua_MethodWrapper(lua_topointer(l, lua_upvalueindex(1)));
 
   if assigned(obj) and assigned(method) then
     result := method(obj, l, 2, pcount);
@@ -532,7 +532,7 @@ begin
           begin
             LogDebug('Registering class method %s.', [classInfo^.Methods[i].MethodName]);
             plua_pushstring(L, classInfo^.Methods[i].MethodName);
-            lua_pushinteger(l, PtrInt(classInfo^.Methods[i].wrapper));
+            lua_pushlightuserdata(l, Pointer(classInfo^.Methods[i].wrapper));
             lua_pushcclosure(L, @plua_call_class_method, 1);
             lua_rawset(l, midx);
           end;
