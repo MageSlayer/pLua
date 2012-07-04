@@ -123,13 +123,18 @@ end;
 
 function plua_tostring(L: PLua_State; Index: Integer): ansistring;
 var
-  Size: Cardinal;
+  Size: size_t;
   S:PChar;
 begin
+  Result:='';
+  if not lua_isstring(L, Index) then Exit;
+
   S := lua_tolstring(L, Index, @Size);
+  if S = nil then Exit;
+
   SetLength(Result, Size);
   if (Size > 0) then
-    Move(S^, Result[1], Size);
+    Move(S^, Pchar(@Result[1])^, Size);
 end;
 
 procedure plua_pushstring(L: PLua_State; AString: AnsiString);
