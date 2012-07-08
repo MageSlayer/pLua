@@ -409,6 +409,7 @@ procedure TLUA.ExecuteCmd(Script: AnsiString);
 begin
   if L= nil then
     Open;
+
   ErrorTest(luaL_loadbuffer(L, PChar(Script), Length(Script), PChar(LibName)));
   ExecuteScript(0);
 end;

@@ -18,6 +18,14 @@ type
   LuaException = class(Exception)
   end;
 
+{$IFDEF LUAJIT}
+  {$IFDEF CPU64}
+  //Currently only x64 exception natively by LuaJit itself
+  //other platform need try/except on Pascal->Lua boundary
+  {$DEFINE LUAJIT_EXCEPTION_SUPPORT}
+  {$ENDIF}
+{$ENDIF}
+
 {$IFDEF LUA_LPEG} // as it links statically, not everybody can need it.
 const
   {$IFDEF WIN32}
@@ -79,6 +87,8 @@ procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer; TypeOnTop:integ
 procedure plua_EnsureStackBalance(l: PLua_State; TopToBe:Integer);
 
 //Balance Lua stacka and throw exception
+procedure plua_RaiseException(const ErrMes:string);overload;
+procedure plua_RaiseException(const ErrMes:string; const Params:array of const);overload;
 procedure plua_RaiseException(l: PLua_State; TopToBe:Integer; const ErrMes:string);overload;
 procedure plua_RaiseException(l: PLua_State; TopToBe:Integer; const ErrMes:string; const Params:array of const);overload;
 
@@ -112,7 +122,7 @@ uses
 
 procedure lua_reporterror(l : PLua_State; const ErrMes:string);
 begin
-  {$IFDEF LUAJIT}
+  {$IFDEF LUAJIT_EXCEPTION_SUPPORT}
   //LuaJit wants native exceptions, not longjmp!
   raise LuaException.Create(ErrMes);
   {$ELSE}
@@ -449,10 +459,20 @@ begin
   end;
 end;
 
+procedure plua_RaiseException(const ErrMes: string);
+begin
+  raise LuaException.Create(ErrMes);
+end;
+
+procedure plua_RaiseException(const ErrMes: string; const Params: array of const);
+begin
+  plua_RaiseException(Format(ErrMes, Params));
+end;
+
 procedure plua_RaiseException(l: PLua_State; TopToBe: Integer; const ErrMes: string);
 begin
   plua_EnsureStackBalance(l, TopToBe);
-  raise Exception.Create(ErrMes);
+  plua_RaiseException(ErrMes);
 end;
 
 procedure plua_RaiseException(l: PLua_State; TopToBe: Integer; const ErrMes: string;

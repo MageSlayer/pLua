@@ -233,6 +233,14 @@ begin
     end;
 end;
 
+function StrToPChar(const S:string):PChar;
+//allocates memory for PChar and copies contents of S, should be freed using StrDispose afterwards
+//does not return nil!
+begin
+  Result:=StrAlloc(Length(S)+1);
+  StrPCopy(Result, S);
+end;
+
 function plua_ref_release(l : PLua_State; obj:PLuaInstanceInfo):boolean;overload;
 begin
   Result:=plua_ref_release(l, obj^.LuaRef);
@@ -334,20 +342,59 @@ begin
   lua_pop(l, 2);
 end;
 
-function plua_call_class_method(l : PLua_State) : integer; cdecl;
+function plua_call_class_method_except_wrapper(l : PLua_State; out exceptionthrown:boolean; out exc_message:pchar) : integer;
+{$IMPLICITEXCEPTIONS ON}
 var
   method : plua_MethodWrapper;
   obj    : TObject;
-  pcount   : Integer;
+  pcount : Integer;
 begin
-  result := 0;
-  pcount := lua_gettop(l);
-  result := 0;
-  obj := plua_getObject(l, 1, False);
-  method := plua_MethodWrapper(lua_topointer(l, lua_upvalueindex(1)));
+  exceptionthrown:=False;
+  exc_message:=nil;
+  try
+    result := 0;
+    pcount := lua_gettop(l);
+    result := 0;
+    obj := plua_getObject(l, 1, False);
+    method := plua_MethodWrapper(lua_topointer(l, lua_upvalueindex(1)));
 
-  if assigned(obj) and assigned(method) then
-    result := method(obj, l, 2, pcount);
+    if assigned(obj) and assigned(method) then
+      result := method(obj, l, 2, pcount);
+  except
+    on E:Exception do
+      begin
+        exceptionthrown:=True;
+        exc_message:=StrToPChar(E.Message);
+      end;
+  end;
+end;
+
+function plua_call_class_method(l : PLua_State) : integer; cdecl;
+{$IMPLICITEXCEPTIONS OFF}
+var
+  exceptionthrown:boolean;
+  exc_message:PChar;
+  curtop : Integer;
+begin
+  {
+    Using lua_error in functions having automatically-generated "finally" code causes access violations.
+    So all exceptions are caught in plua_call_class_method_except_wrapper function and
+    returned as a simple PChar strings to avoid any automatic release.
+    This function forcibly lacks "finally" code - {$IMPLICITEXCEPTIONS OFF}
+  }
+  Result:=plua_call_class_method_except_wrapper(l, exceptionthrown, exc_message);
+
+  if exceptionthrown then
+    begin
+      Result:=0;
+      curtop:=lua_gettop(l);
+      lua_pop(l, curtop); //remove both parameters and any non-complete return values.
+
+      lua_pushstring(L, exc_message);
+      StrDispose(exc_message);
+
+      lua_error(L); //does longjmp, almost the same as exception raising
+    end;
 end;
 
 function plua_new_class(l : PLua_State) : integer; cdecl;
