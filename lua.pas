@@ -34,7 +34,7 @@ const
 {$ELSE}
   //LuaDLL = 'lua5.1.so';
   {$IFDEF LUAJIT}
-  LuaDLL = 'libluajit-5.1.so';
+  LuaDLL = 'libluajit-2.0.so';
   {$ELSE}
   LuaDLL = 'liblua.so.5';
   {$ENDIF}
