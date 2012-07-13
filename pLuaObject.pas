@@ -57,6 +57,10 @@ type
     l         : PLua_state;
     obj       : TObject;
     Delegate  : TLuaObjectEventDelegate;
+    {$IFDEF DEBUG}
+    //in case some leakage/double freeing occurs, we'll know what class did that.
+    ClassName:string;
+    {$ENDIF}
   end;
 
   TClassIdObjMap = specialize TFPGMap<TLuaClassId, PLuaClassInfo>;
@@ -840,6 +844,9 @@ begin
   Result^.ClassId := classId;
   Result^.l := l;
   Result^.obj := ObjectInstance;
+  {$IFDEF DEBUG}
+  Result^.ClassName:=ObjectInstance.ClassName;
+  {$ENDIF}
 
   obj_user:=lua_newuserdata(L, sizeof(obj_user^));
   obj_user^:=Result;

@@ -253,11 +253,13 @@ begin
         begin
           if LeakWarnings then
             begin
+              //we cannot trust nfo^.obj is still valid here, so do not try to read ClassName via nfo^.obj.
+              //use only debug info when accesible.
               if nfo^.LuaRef <> LUA_NOREF then
                  LogDebug('Lua object $%x (%s) has lua ref (%d) unfreed.',
-                          [ PtrInt(nfo^.obj), nfo^.obj.ClassName, nfo^.LuaRef ]);
+                          [ PtrInt(nfo^.obj), {$IFDEF DEBUG}nfo^.ClassName{$ELSE}'unknown'{$ENDIF}, nfo^.LuaRef ]);
 
-              LogDebug('Lua object $%x (%s) memory leak. Freeing...', [ PtrInt(nfo^.obj), nfo^.obj.ClassName ]);
+              LogDebug('Lua object $%x (%s) memory leak. Freeing...', [ PtrInt(nfo^.obj), {$IFDEF DEBUG}nfo^.ClassName{$ELSE}'unknown'{$ENDIF} ]);
             end;
 
           plua_ref_release( l, nfo );
