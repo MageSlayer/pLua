@@ -408,8 +408,9 @@ begin
 
   lua_pushstring(l, '__ClassId');
   lua_rawget(l, tidx);
-  classId := lua_touserdata(l, -1);
+  classId := lua_topointer(l, -1);
   lua_pop(l, 1);
+  if classId = nil then Exit;
 
   cInfo := LuaSelf(l).LuaClasses.ClassInfoById[ classId ];
 
@@ -495,6 +496,11 @@ begin
 
   plua_pushstring(l, classInfo^.ClassName);
   lua_newtable(l);
+
+  //assign internal class id to class table
+  lua_pushstring(L, '__ClassId');
+  lua_pushlightuserdata(L, classInfo^.ClassId);
+  lua_rawset(L, -3);
 
   ProcsMetaTable:=ClassProcsMetaTableName(classInfo);
   PropsMetaTable:=ClassPropsMetaTableName(classInfo);
@@ -582,10 +588,6 @@ begin
   //populate main class metatable
   luaL_getmetatable(l, PChar(ClassMetaTable) );
   midx := lua_gettop(l);
-
-  lua_pushstring(L, '__ClassId');
-  lua_pushlightuserdata(L, classInfo^.ClassId);
-  lua_rawset(L, midx);
 
   lua_pushstring(L, '__call');
   lua_pushcfunction(L, @plua_new_class);
