@@ -41,6 +41,7 @@ function luaopen_lpeg (L: PLua_State):Integer;cdecl;external LpegLib;
 
 function  plua_tostring(L: PLua_State; Index: Integer): ansistring;
 procedure plua_pushstring(L: PLua_State; AString : AnsiString);
+function StrToPChar(const S:string):PChar;
 
 procedure plua_RegisterLuaTable( l:PLua_State; Name : AnsiString;
                                  Reader : lua_CFunction = nil;
@@ -150,6 +151,14 @@ end;
 procedure plua_pushstring(L: PLua_State; AString: AnsiString);
 begin
   lua_pushstring(l, pchar(AString));
+end;
+
+function StrToPChar(const S:string):PChar;
+//allocates memory for PChar and copies contents of S, should be freed using StrDispose afterwards
+//does not return nil!
+begin
+  Result:=StrAlloc(Length(S)+1);
+  StrPCopy(Result, S);
 end;
 
 procedure plua_RegisterLuaTable(l: PLua_State; Name: AnsiString;

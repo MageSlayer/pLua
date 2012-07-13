@@ -233,14 +233,6 @@ begin
     end;
 end;
 
-function StrToPChar(const S:string):PChar;
-//allocates memory for PChar and copies contents of S, should be freed using StrDispose afterwards
-//does not return nil!
-begin
-  Result:=StrAlloc(Length(S)+1);
-  StrPCopy(Result, S);
-end;
-
 function plua_ref_release(l : PLua_State; obj:PLuaInstanceInfo):boolean;overload;
 begin
   Result:=plua_ref_release(l, obj^.LuaRef);
@@ -342,19 +334,16 @@ begin
   lua_pop(l, 2);
 end;
 
-function plua_call_class_method_except_wrapper(l : PLua_State; out exceptionthrown:boolean; out exc_message:pchar) : integer;
-{$IMPLICITEXCEPTIONS ON}
+function plua_call_class_method_except_wrapper(l : PLua_State; out exc_message:pchar) : integer;
 var
   method : plua_MethodWrapper;
   obj    : TObject;
   pcount : Integer;
 begin
-  exceptionthrown:=False;
+  result := 0;
   exc_message:=nil;
   try
-    result := 0;
     pcount := lua_gettop(l);
-    result := 0;
     obj := plua_getObject(l, 1, False);
     method := plua_MethodWrapper(lua_topointer(l, lua_upvalueindex(1)));
 
@@ -363,16 +352,14 @@ begin
   except
     on E:Exception do
       begin
-        exceptionthrown:=True;
         exc_message:=StrToPChar(E.Message);
       end;
   end;
 end;
 
-function plua_call_class_method(l : PLua_State) : integer; cdecl;
 {$IMPLICITEXCEPTIONS OFF}
+function plua_call_class_method(l : PLua_State) : integer; cdecl;
 var
-  exceptionthrown:boolean;
   exc_message:PChar;
   curtop : Integer;
 begin
@@ -382,9 +369,9 @@ begin
     returned as a simple PChar strings to avoid any automatic release.
     This function forcibly lacks "finally" code - {$IMPLICITEXCEPTIONS OFF}
   }
-  Result:=plua_call_class_method_except_wrapper(l, exceptionthrown, exc_message);
+  Result:=plua_call_class_method_except_wrapper(l, exc_message);
 
-  if exceptionthrown then
+  if exc_message <> nil then
     begin
       Result:=0;
       curtop:=lua_gettop(l);
@@ -396,6 +383,7 @@ begin
       lua_error(L); //does longjmp, almost the same as exception raising
     end;
 end;
+{$IMPLICITEXCEPTIONS ON}
 
 function plua_new_class(l : PLua_State) : integer; cdecl;
 var

@@ -19,6 +19,9 @@ uses
 type
   TLua = class;
 
+  //function type which supports native Pascal exception handling
+  TLuaProc = function (l : PLua_State; paramcount: Integer) : integer;
+
   TLuaOnException = procedure( Title: ansistring; Line: Integer; Msg: ansistring;
                                var handled : Boolean) {$IFDEF TLuaHandlersAsIsObjectType}of object{$ENDIF};
   TLuaOnLoadLibs  = procedure( LuaWrapper : TLua ) {$IFDEF TLuaHandlersAsIsObjectType}of object{$ENDIF};
@@ -98,7 +101,12 @@ type
     procedure ExecuteCmd(Script:AnsiString);
     procedure ExecuteAsRepl(const Script:String; out ReplResult:string);
     procedure ExecuteFile(FileName : AnsiString);
-    procedure RegisterLuaMethod(aMethodName: AnsiString; Func: lua_CFunction);
+
+    //simple registering of C-function. No proper support for exception handling!!!
+    procedure RegisterLuaMethod(const aMethodName: AnsiString; Func: lua_CFunction);
+    //registering of pascal-function. Proper support for exception handling!!!
+    procedure RegisterLuaMethod(const aMethodName: AnsiString; Func: TLuaProc);
+
     procedure RegisterLuaTable(PropName: AnsiString; reader: lua_CFunction; writer : lua_CFunction = nil);
     function  FunctionExists(aMethodName:AnsiString) : Boolean;
     function  CallFunction( FunctionName :AnsiString; const Args: array of Variant;
@@ -536,7 +544,7 @@ begin
   lua_pop(L, 1);
 end;
 
-procedure TLUA.RegisterLUAMethod(aMethodName: AnsiString; Func: lua_CFunction);
+procedure TLUA.RegisterLUAMethod(const aMethodName: AnsiString; Func: lua_CFunction);
 begin
   if L = nil then
     Open;
@@ -545,6 +553,66 @@ begin
     FMethods.AddObject(aMethodName, TObject(@Func))
   else
     FMethods.Objects[FMethods.IndexOf(aMethodName)] := TObject(@Func);
+end;
+
+function plua_call_method_except_wrapper(l : PLua_State; out exc_message:pchar) : integer;
+var
+  method : TLuaProc;
+  pcount : Integer;
+begin
+  result := 0;
+  exc_message:=nil;
+  try
+    pcount := lua_gettop(l);
+    method := TLuaProc(lua_topointer(l, lua_upvalueindex(1)));
+
+    if assigned(method) then
+      result := method(l, pcount);
+  except
+    on E:Exception do
+      begin
+        exc_message:=StrToPChar(E.Message);
+      end;
+  end;
+end;
+
+{$IMPLICITEXCEPTIONS OFF}
+function plua_call_method(l : PLua_State) : integer; cdecl;
+var
+  exc_message:PChar;
+  curtop : Integer;
+begin
+  {
+    Using lua_error in functions having automatically-generated "finally" code causes access violations.
+    So all exceptions are caught in plua_call_class_method_except_wrapper function and
+    returned as a simple PChar strings to avoid any automatic release.
+    This function forcibly lacks "finally" code - {$IMPLICITEXCEPTIONS OFF}
+  }
+  Result:=plua_call_method_except_wrapper(l, exc_message);
+
+  if exc_message <> nil then
+    begin
+      Result:=0;
+      curtop:=lua_gettop(l);
+      lua_pop(l, curtop); //remove both parameters and any non-complete return values.
+
+      lua_pushstring(L, exc_message);
+      StrDispose(exc_message);
+
+      lua_error(L); //does longjmp, almost the same as exception raising
+    end;
+end;
+{$IMPLICITEXCEPTIONS ON}
+
+procedure TLUA.RegisterLuaMethod(const aMethodName: AnsiString; Func: TLuaProc);
+begin
+  if L = nil then
+    Open;
+
+  plua_pushstring(L, aMethodName);
+  lua_pushlightuserdata(l, Pointer(Func));
+  lua_pushcclosure(L, @plua_call_method, 1);
+  lua_rawset(l, LUA_GLOBALSINDEX);
 end;
 
 procedure TLUA.RegisterLuaTable(PropName: AnsiString; reader: lua_CFunction;
