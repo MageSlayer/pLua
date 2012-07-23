@@ -106,11 +106,13 @@ type
     procedure RegisterLuaMethod(const aMethodName: AnsiString; Func: lua_CFunction);
     //registering of pascal-function. Proper support for exception handling!!!
     procedure RegisterLuaMethod(const aMethodName: AnsiString; Func: TLuaProc);
+    procedure RegisterLuaMethod(const aPackage, aMethodName: AnsiString; Func: TLuaProc);
 
     procedure RegisterLuaTable(PropName: AnsiString; reader: lua_CFunction; writer : lua_CFunction = nil);
     function  FunctionExists(aMethodName:AnsiString) : Boolean;
     function  CallFunction( FunctionName :AnsiString; const Args: array of Variant;
                             Results : PVariantArray = nil):Integer;
+    function  TableExists(const TableName):boolean;
     function  TableFunctionExists(TableName, FunctionName : AnsiString; out tblidx : Integer) : Boolean; overload;
     function  TableFunctionExists(TableName, FunctionName : AnsiString) : Boolean; overload;
     function  CallTableFunction( TableName, FunctionName :AnsiString;
@@ -617,6 +619,30 @@ begin
   lua_rawset(l, LUA_GLOBALSINDEX);
 end;
 
+procedure TLUA.RegisterLuaMethod(const aPackage, aMethodName: AnsiString; Func: TLuaProc);
+begin
+  if L = nil then
+    Open;
+
+  if not TableExists(aPackage) then
+    begin
+      pLua_TableGlobalCreate(L, aPackage);
+    end;
+
+  //push aPackage table onto stack
+  plua_pushstring(L, aPackage);
+  lua_rawget(L, LUA_GLOBALSINDEX);
+
+  //write a method into aPackage table
+  plua_pushstring(L, aMethodName);
+  lua_pushlightuserdata(l, Pointer(Func));
+  lua_pushcclosure(L, @plua_call_method, 1);
+  lua_rawset(l, -3);
+
+  //pop table
+  lua_pop(l, -1);
+end;
+
 procedure TLUA.RegisterLuaTable(PropName: AnsiString; reader: lua_CFunction;
   writer: lua_CFunction);
 begin
@@ -684,6 +710,15 @@ begin
     on E:LuaException do
       HandleException(E);
   end;
+end;
+
+function TLUA.TableExists(const TableName): boolean;
+begin
+  lua_pushstring(L, PChar(TableName));
+  lua_rawget(L, LUA_GLOBALSINDEX);
+  result := lua_istable(L, -1);
+  if result then
+    lua_pop(l, -1);
 end;
 
 procedure TLUA.Close;
