@@ -784,7 +784,7 @@ begin
   if instance^.OwnsInstance then
     begin
       RecInfo:=S.LuaRecords.RecInfoById[ instance^.RecordId ];
-      RecInfo^.Release(instance, nil);
+      RecInfo^.Release(instance^.RecordPointer, nil);
     end;
   Freemem(instance);
 end;
