@@ -37,6 +37,7 @@ type
     FLibFile,
     FLibName: AnsiString;
     FMethods : TStringList;
+    FErrHandler: Integer;
 
     //Lua internal objects
     FLuaObjects : TList;
@@ -305,6 +306,8 @@ begin
 end;
 
 procedure TLUA.ExecuteScript(NResults: integer);
+var errCode:Integer;
+    msg:string;
 begin
   if L = nil then
     Open;
@@ -313,7 +316,14 @@ begin
      (lua_type(L,-1) <> LUA_TFUNCTION) then
      raise Exception.Create('No script is loaded at stack');
 
-  ErrorTest(lua_pcall(L, 0, NResults, 0));
+  //ErrorTest(lua_pcall(L, 0, NResults, 0));
+
+  errCode:=lua_pcall(L, 0, NResults, FErrHandler);
+  if errCode <> 0 then
+    begin
+      msg := plua_tostring(l, -1);
+      HandleException(LuaException.Create(msg));
+    end;
 end;
 
 procedure TLUA.Execute;
@@ -620,27 +630,30 @@ begin
 end;
 
 procedure TLUA.RegisterLuaMethod(const aPackage, aMethodName: AnsiString; Func: TLuaProc);
+var StartTop:Integer;
 begin
   if L = nil then
     Open;
 
-  if not TableExists(aPackage) then
-    begin
-      pLua_TableGlobalCreate(L, aPackage);
-    end;
+  StartTop:=lua_gettop(L);
+  try
+    if not TableExists(aPackage) then
+      begin
+        pLua_TableGlobalCreate(L, aPackage);
+      end;
 
-  //push aPackage table onto stack
-  plua_pushstring(L, aPackage);
-  lua_rawget(L, LUA_GLOBALSINDEX);
+    //push aPackage table onto stack
+    plua_pushstring(L, aPackage);
+    lua_rawget(L, LUA_GLOBALSINDEX);
 
-  //write a method into aPackage table
-  plua_pushstring(L, aMethodName);
-  lua_pushlightuserdata(l, Pointer(Func));
-  lua_pushcclosure(L, @plua_call_method, 1);
-  lua_rawset(l, -3);
-
-  //pop table
-  lua_pop(l, -1);
+    //write a method into aPackage table
+    plua_pushstring(L, aMethodName);
+    lua_pushlightuserdata(l, Pointer(Func));
+    lua_pushcclosure(L, @plua_call_method, 1);
+    lua_rawset(l, -3);
+  finally
+    plua_EnsureStackBalance(L, StartTop);
+  end;
 end;
 
 procedure TLUA.RegisterLuaTable(PropName: AnsiString; reader: lua_CFunction;
@@ -713,16 +726,21 @@ begin
 end;
 
 function TLUA.TableExists(const TableName): boolean;
+var StartTop:Integer;
 begin
-  lua_pushstring(L, PChar(TableName));
-  lua_rawget(L, LUA_GLOBALSINDEX);
-  result := lua_istable(L, -1);
-  if result then
-    lua_pop(l, -1);
+  StartTop:=lua_gettop(L);
+  try
+    lua_pushstring(L, PChar(TableName));
+    lua_rawget(L, LUA_GLOBALSINDEX);
+    result := lua_istable(L, -1);
+  finally
+    plua_EnsureStackBalance(L, StartTop);
+  end;
 end;
 
 procedure TLUA.Close;
 begin
+  FErrHandler:=-1;
   if L <> nil then
     begin
       ClearObjects(True);
@@ -750,6 +768,15 @@ begin
   //Register self in Lua VM to be able call from Lua code/native handlers
   FLuaSelf:=plua_pushexisting_special(l, Self, nil, False);
   lua_setglobal( L, PChar(Lua_Self) );
+
+  //push error handler on stack to be able to reference it everywhere
+  // http://tinylittlelife.org/?p=254
+  lua_getglobal(L, 'debug');
+  //-1 is the top of the stack
+  lua_getfield(L, -1, 'traceback');
+  //traceback is on top, remove debug from 2nd spot
+  lua_remove(L, -2);
+  FErrHandler:=lua_gettop(L);
 end;
 
 function LuaSelf(L: PLua_State): TLuaInternalState;

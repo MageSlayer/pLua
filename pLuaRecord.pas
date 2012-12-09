@@ -361,6 +361,8 @@ begin
   lua_pushstring(L, '__newindex');
   lua_pushcfunction(L, @plua_newindex_record);
   lua_rawset(L, midx);
+
+  lua_pop(L, -2);
 end;
 
 procedure plua_newRecordInfo(var RecordInfoPointer: PLuaRecordInfo);
