@@ -428,12 +428,18 @@ begin
 end;
 
 procedure TLUA.ExecuteCmd(Script: AnsiString);
+var StartTop:Integer;
 begin
   if L= nil then
     Open;
 
-  ErrorTest(luaL_loadbuffer(L, PChar(Script), Length(Script), PChar(LibName)));
-  ExecuteScript(0);
+  StartTop:=lua_gettop(l);
+  try
+    ErrorTest(luaL_loadbuffer(L, PChar(Script), Length(Script), PChar(LibName)));
+    ExecuteScript(0);
+  finally
+    plua_EnsureStackBalance(l, StartTop);
+  end;
 end;
 
 procedure TLUA.ExecuteAsRepl(const Script: String; out ReplResult: string);
