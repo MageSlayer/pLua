@@ -14,6 +14,9 @@ uses
   dl;
 {$ENDIF}
 
+//user-defined settings
+{$I defines.inc}
+
 {$DEFINE LUA51}
 
 type
