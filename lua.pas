@@ -17,7 +17,13 @@ uses
 {$DEFINE LUA51}
 
 type
+  {$IFDEF CPU32}
   size_t   = type Cardinal;
+  {$ENDIF}
+  {$IFDEF CPU64}
+  size_t   = type NativeUint;
+  {$ENDIF}
+
   Psize_t  = ^size_t;
   PPointer = ^Pointer;
 
