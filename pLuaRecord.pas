@@ -249,7 +249,7 @@ begin
   oidx := lua_gettop(L);
 
   lua_pushliteral(L, '__instance');
-  lua_pushinteger(L, PtrInt(instance));
+  lua_pushinteger(L, PtrUint(instance));
   lua_rawset(l, oidx);
 
   lua_pushstring(L, 'release');
@@ -441,7 +441,7 @@ begin
   oidx := lua_gettop(L);
 
   lua_pushliteral(L, '__instance');
-  lua_pushinteger(L, PtrInt(Result));
+  lua_pushinteger(L, PtrUint(Result));
   lua_rawset(l, oidx);
 
   lua_pushliteral(L, '__instance2');
@@ -468,7 +468,7 @@ begin
   RecordInfo.Properties[idx].PropName := propertyName;
   RecordInfo.Properties[idx].Reader   := Reader;
   RecordInfo.Properties[idx].Writer   := Writer;
-  RecordInfo.PropHandlers.AddWord(propertyName)^.data := pointer(PtrInt(idx));
+  RecordInfo.PropHandlers.AddWord(propertyName)^.data := pointer(PtrUint(idx));
 end;
 
 function plua_getRecord(l: PLua_State; idx: Integer): Pointer;
@@ -478,7 +478,7 @@ begin
   result := nil;
   plua_pushstring(l, '__instance');
   lua_rawget(l, plua_absindex(l, idx));
-  instance := PLuaRecordInstanceInfo(ptrint(lua_tointeger(l, -1)));
+  instance := PLuaRecordInstanceInfo(PtrUint(lua_tointeger(l, -1)));
   lua_pop(l, 1);
   if assigned(instance) and assigned(instance^.RecordPointer) then
     result := instance^.RecordPointer;
@@ -490,7 +490,7 @@ begin
   result := nil;
   plua_pushstring(l, '__instance');
   lua_rawget(l, plua_absindex(l, idx));
-  result := PLuaRecordInstanceInfo(ptrint(lua_tointeger(l, -1)));
+  result := PLuaRecordInstanceInfo(PtrUint(lua_tointeger(l, -1)));
   lua_pop(l, 1);
 end;
 

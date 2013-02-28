@@ -228,6 +228,7 @@ begin
   FLuaRecords := TLuaRecordList.Create;
   FClassTypesList := TLuaClassTypesList.Create;
   FRecordTypesList := TLuaRecordTypesList.Create;
+  FLibName:='main';
 
   Open;
 end;

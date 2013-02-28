@@ -37,6 +37,9 @@ const
 {$IFDEF WIN32}
   LuaDLL = 'lua5.1.dll';
 {$ENDIF}
+{$IFDEF WIN64}
+  LuaDLL = 'lua5.1-x64.dll';
+{$ENDIF}
 {$IFDEF UNIX}
 {$IFDEF DARWIN}
   LuaDLL = 'lua5.1.dylib';
@@ -84,7 +87,7 @@ const
 *)
 type
   LUA_NUMBER_  = type Double;            // ending underscore is needed in Pascal
-  LUA_INTEGER_ = type Integer;
+  LUA_INTEGER_ = type PtrInt;
 
 (*
 @@ LUA_IDSIZE gives the maximum size for the description of the source

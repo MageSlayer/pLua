@@ -244,7 +244,7 @@ begin
       Idx := plua_absindex(L, Idx);
       lua_pushstring(L, '_Self');
       lua_gettable(L, Idx);
-      result := TLuaObject(ptrint(lua_tointeger(L, -1)));
+      result := TLuaObject(PtrUint(lua_tointeger(L, -1)));
       lua_pop(L, 1);
     end
   else
@@ -274,7 +274,7 @@ begin
   idx := lua_gettop(L);
 
   lua_pushliteral(L, '_Self');
-  lua_pushinteger(L, PtrInt(Pointer(E)));
+  lua_pushinteger(L, PtrUint(Pointer(E)));
   lua_rawset(L, idx);
 
   lua_newtable(L);
@@ -372,7 +372,7 @@ begin
   idx := lua_gettop(L);
 
   lua_pushliteral(L, '_Self');
-  lua_pushinteger(L, PtrInt(Pointer(ObjectInstance)));
+  lua_pushinteger(L, PtrUint(Pointer(ObjectInstance)));
   lua_rawset(L, idx);
 
   lua_newtable(L);
@@ -415,7 +415,7 @@ begin
   idx := lua_gettop(L);
 
   lua_pushliteral(L, '_Self');
-  lua_pushinteger(L, PtrInt(Pointer(E)));
+  lua_pushinteger(L, PtrUint(Pointer(E)));
   lua_rawset(L, idx);
 
   lua_newtable(L);

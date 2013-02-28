@@ -332,7 +332,7 @@ begin
                                  if (Frac(dataNum)<>0) then
                                    Result :=VarAsType(dataNum, varDouble)
                                  else
-                                   Result :=Round(VarAsType(dataNum, varDouble));
+                                   Result :=VarAsType(Trunc(dataNum), varDouble);
                                end;
                            end;
     LUA_TTABLE           : result := plua_TableToVariantArray(L, Index);

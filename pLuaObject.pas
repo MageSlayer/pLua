@@ -676,7 +676,7 @@ begin
   ClassInfo.Properties[idx].PropName := propertyName;
   ClassInfo.Properties[idx].Reader   := Reader;
   ClassInfo.Properties[idx].Writer   := Writer;
-  ClassInfo.PropHandlers.AddWord(propertyName)^.data := pointer(PtrInt(idx));
+  ClassInfo.PropHandlers.AddWord(propertyName)^.data := pointer(PtrUint(idx));
 end;
 
 procedure plua_AddClassMethod(var ClassInfo: TLuaClassInfo;
@@ -818,7 +818,7 @@ begin
     end
     else
     begin
-      LogDebug('plua_pushexisting. Object $%x', [PtrInt(ObjectInstance)]);
+      LogDebug('plua_pushexisting. Object $%x', [PtrUint(ObjectInstance)]);
 
       Lua:=LuaSelf(l);
 
@@ -861,7 +861,7 @@ begin
       lua_rawgeti(Result^.l, LUA_REGISTRYINDEX, Result^.LuaRef);
     end;
 
-  LogDebug('plua_pushexisting. Object $%x. LuaRef=%d', [ PtrInt(ObjectInstance), Result^.LuaRef ]);
+  LogDebug('plua_pushexisting. Object $%x. LuaRef=%d', [ PtrUint(ObjectInstance), Result^.LuaRef ]);
 
   plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
 end;
@@ -881,7 +881,7 @@ var objinfo:PLuaInstanceInfo;
 begin
   objinfo := plua_GetObjectInfo(l, ObjectInstance);
   if objinfo = nil then
-     raise LuaException.CreateFmt('Object $%x does not have object info', [PtrInt(ObjectInstance)]);
+     raise LuaException.CreateFmt('Object $%x does not have object info', [PtrUint(ObjectInstance)]);
 
   //remove reference
   Result:=plua_ref_release(l, objinfo);
@@ -896,7 +896,7 @@ begin
   if assigned(ObjectInfo) then
     begin
       if ObjectInfo^.LuaRef = LUA_NOREF then
-         raise LuaException.CreateFmt('Object $%x does not have Lua ref. Can'' push it on stack', [PtrInt(ObjectInfo^.obj)]);
+         raise LuaException.CreateFmt('Object $%x does not have Lua ref. Can'' push it on stack', [PtrUint(ObjectInfo^.obj)]);
 
       lua_rawgeti(ObjectInfo^.l, LUA_REGISTRYINDEX, ObjectInfo^.LuaRef);
       result := true;
