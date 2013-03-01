@@ -7,6 +7,8 @@ interface
 {$TYPEDADDRESS ON}
 {$ENDIF}
 
+{$I pLua.inc}
+
 {$DEFINE TLuaAsComponent}
 {$DEFINE TLuaHandlersAsIsObjectType}
 
@@ -598,7 +600,7 @@ begin
 end;
 
 {$IMPLICITEXCEPTIONS OFF}
-function plua_call_method(l : PLua_State) : integer; cdecl;
+function plua_call_method(l : PLua_State) : integer; extdecl;
 var
   exc_message:PChar;
   curtop : Integer;

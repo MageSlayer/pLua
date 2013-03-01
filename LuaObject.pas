@@ -4,6 +4,8 @@ unit LuaObject;
 {$mode objfpc}{$H+}
 {$ENDIF}
 
+{$I pLua.inc}
+
 interface
 
 uses
@@ -59,14 +61,14 @@ procedure RegisterLuaObject(L: Plua_State);
 procedure RegisterTLuaObject(L : Plua_State; ObjectName : AnsiString; CreateFunc : lua_CFunction; MethodsCallback : TLuaObjectRegisterMethodsCallback = nil);
 procedure RegisterObjectInstance(L : Plua_State; aClassName, InstanceName : AnsiString; ObjectInstance : TLuaObject);
 procedure RegisterMethod(L : Plua_State; TheMethodName : AnsiString; TheMethodAddress : lua_CFunction; classTable : Integer);
-function  new_LuaObject(L : PLua_State; aClassName : AnsiString; NewCallback : TLuaObjectNewCallback) : Integer; cdecl;
+function  new_LuaObject(L : PLua_State; aClassName : AnsiString; NewCallback : TLuaObjectNewCallback) : Integer; extdecl;
 
 procedure PushTLuaObject(L : PLua_State; ObjectInstance : TLuaObject);
 
-function  new_TLuaObject(L : PLua_State) : Integer; cdecl;
-function  index_TLuaObject(L : PLua_State) : Integer; cdecl;
-function  newindex_TLuaObject(L : PLua_State) : Integer; cdecl;
-function  gc_TLuaObject(L : PLua_State) : Integer; cdecl;
+function  new_TLuaObject(L : PLua_State) : Integer; extdecl;
+function  index_TLuaObject(L : PLua_State) : Integer; extdecl;
+function  newindex_TLuaObject(L : PLua_State) : Integer; extdecl;
+function  gc_TLuaObject(L : PLua_State) : Integer; extdecl;
 procedure RegisterClassTLuaObject(L : Plua_State);
 
 implementation
@@ -256,7 +258,7 @@ begin
   lua_rawgeti(L, LUA_REGISTRYINDEX, ObjectInstance.FLuaReference);
 end;
 
-function new_TLuaObject(L : PLua_State) : Integer; cdecl;
+function new_TLuaObject(L : PLua_State) : Integer; extdecl;
 var
   P, E : TLuaObject;
   n, idx, idx2, mt : Integer;
@@ -292,7 +294,7 @@ begin
   result := 1;
 end;
 
-function index_TLuaObject(L : PLua_State) : Integer; cdecl;
+function index_TLuaObject(L : PLua_State) : Integer; extdecl;
 var
   E : TLuaObject;
   propName : AnsiString;
@@ -322,7 +324,7 @@ begin
     end;
 end;
 
-function newindex_TLuaObject(L : PLua_State) : Integer; cdecl;
+function newindex_TLuaObject(L : PLua_State) : Integer; extdecl;
 var
   TableIndex, ValueIndex : Integer;
   E : TLuaObject;
@@ -348,7 +350,7 @@ begin
     end;
 end;
 
-function gc_TLuaObject(L : PLua_State) : Integer; cdecl;
+function gc_TLuaObject(L : PLua_State) : Integer; extdecl;
 var
   E : TLuaObject;
 begin
@@ -397,7 +399,7 @@ begin
   lua_rawset(L, classTable);
 end;
 
-function new_LuaObject(L : PLua_State; aClassName : AnsiString; NewCallback : TLuaObjectNewCallback): Integer; cdecl;
+function new_LuaObject(L : PLua_State; aClassName : AnsiString; NewCallback : TLuaObjectNewCallback): Integer; extdecl;
 var
   P, E : TLuaObject;
   n, idx, idx2, mt : Integer;

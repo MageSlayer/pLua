@@ -14,6 +14,8 @@ uses
   dl;
 {$ENDIF}
 
+{$I pLua.inc}
+
 //user-defined settings
 {$I defines.inc}
 
@@ -179,21 +181,21 @@ const
   LUA_ERRERR    = 5;
 
 type
-  lua_CFunction = function(L : Plua_State) : Integer; cdecl;
+  lua_CFunction = function(L : Plua_State) : Integer; extdecl;
 
   (*
   ** functions that read/write blocks when loading/dumping Lua chunks
   *)
   lua_Reader = function (L : Plua_State; ud : Pointer;
-                         sz : Psize_t) : PChar; cdecl;
-  lua_Writer = function (L : Plua_State; const p : Pointer; sz : size_t;
-                         ud : Pointer) : Integer; cdecl;
+                         sz : Psize_t) : PChar; extdecl;
+  lua_Writer = function (L : Plua_State; p : Pointer; sz : size_t;
+                         ud : Pointer) : Integer; extdecl;
 
   (*
   ** prototype for memory-allocation functions
   *)
   lua_Alloc = function (ud, ptr : Pointer;
-                        osize, nsize : size_t) : Pointer; cdecl;
+                        osize, nsize : size_t) : Pointer; extdecl;
 
 const
   (*
@@ -228,175 +230,175 @@ type
 ** state manipulation
 *)
 function  lua_newstate(f : lua_Alloc; ud : Pointer) : Plua_State;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_close(L: Plua_State);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function  lua_newthread(L : Plua_State) : Plua_State;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function  lua_atpanic(L : Plua_State; panicf : lua_CFunction) : lua_CFunction;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 
 (*
 ** basic stack manipulation
 *)
 function  lua_gettop(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_settop(L : Plua_State; idx : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_pushvalue(L : Plua_State; idx : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_remove(L : Plua_State; idx : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_insert(L : Plua_State; idx : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_replace(L : Plua_State; idx : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function  lua_checkstack(L : Plua_State; sz : Integer) : LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 procedure lua_xmove(src, dest : Plua_State; n : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 
 (*
 ** access functions (stack -> C)
 *)
 function lua_isnumber(L : Plua_State; idx : Integer) : LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_isstring(L : Plua_State; idx : Integer) : LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_iscfunction(L : Plua_State; idx : Integer) : LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_isuserdata(L : Plua_State; idx : Integer) : LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_type(L : Plua_State; idx : Integer) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_typename(L : Plua_State; tp : Integer) : PChar;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function lua_equal(L : Plua_State; idx1, idx2 : Integer) : LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_rawequal(L : Plua_State; idx1, idx2 : Integer) : LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_lessthan(L : Plua_State; idx1, idx2 : Integer) : LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function lua_tonumber(L : Plua_State; idx : Integer) : lua_Number;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_tointeger(L : Plua_State; idx : Integer) : lua_Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_toboolean(L : Plua_State; idx : Integer) : LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_tolstring(L : Plua_State; idx : Integer;
                        len : Psize_t) : PChar;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_objlen(L : Plua_State; idx : Integer) : size_t;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_tocfunction(L : Plua_State; idx : Integer) : lua_CFunction;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_touserdata(L : Plua_State; idx : Integer) : Pointer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_tothread(L : Plua_State; idx : Integer) : Plua_State;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_topointer(L : Plua_State; idx : Integer) : Pointer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 
 (*
 ** push functions (C -> stack)
 *)
 procedure lua_pushnil(L : Plua_State);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_pushnumber(L : Plua_State; n : lua_Number);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_pushinteger(L : Plua_State; n : lua_Integer);
-  cdecl; external LuaDLL;
-procedure lua_pushlstring(L : Plua_State; const s : PChar; ls : size_t);
-  cdecl; external LuaDLL;
-procedure lua_pushstring(L : Plua_State; const s : PChar);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
+procedure lua_pushlstring(L : Plua_State; s : PChar; ls : size_t);
+  extdecl; external LuaDLL;
+procedure lua_pushstring(L : Plua_State; s : PChar);
+  extdecl; external LuaDLL;
 function  lua_pushvfstring(L : Plua_State;
-                           const fmt : PChar; argp : Pointer) : PChar;
-  cdecl; external LuaDLL;
-function  lua_pushfstring(L : Plua_State; const fmt : PChar) : PChar; varargs;
-  cdecl; external LuaDLL;
+                           fmt : PChar; argp : Pointer) : PChar;
+  extdecl; external LuaDLL;
+function  lua_pushfstring(L : Plua_State; fmt : PChar) : PChar; varargs;
+  extdecl; external LuaDLL;
 procedure lua_pushcclosure(L : Plua_State; fn : lua_CFunction; n : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_pushboolean(L : Plua_State; b : LongBool);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_pushlightuserdata(L : Plua_State; p : Pointer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function  lua_pushthread(L : Plua_state) : Cardinal;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 
 (*
 ** get functions (Lua -> stack)
 *)
 procedure lua_gettable(L : Plua_State ; idx : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_getfield(L : Plua_State; idx : Integer; k : PChar);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_rawget(L : Plua_State; idx : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_rawgeti(L : Plua_State; idx, n : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_createtable(L : Plua_State; narr, nrec : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function  lua_newuserdata(L : Plua_State; sz : size_t) : Pointer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function  lua_getmetatable(L : Plua_State; objindex : Integer) : LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_getfenv(L : Plua_State; idx : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 
 (*
 ** set functions (stack -> Lua)
 *)
 procedure lua_settable(L : Plua_State; idx : Integer);
-  cdecl; external LuaDLL;
-procedure lua_setfield(L : Plua_State; idx : Integer; const k : PChar);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
+procedure lua_setfield(L : Plua_State; idx : Integer; k : PChar);
+  extdecl; external LuaDLL;
 procedure lua_rawset(L : Plua_State; idx : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_rawseti(L : Plua_State; idx , n: Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_setmetatable(L : Plua_State; objindex : Integer): LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_setfenv(L : Plua_State; idx : Integer): LongBool;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 (*
 ** `load' and `call' functions (load and run Lua code)
 *)
 procedure lua_call(L : Plua_State; nargs, nresults : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function  lua_pcall(L : Plua_State;
                     nargs, nresults, errfunc : Integer) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function  lua_cpcall(L : Plua_State;
                      func : lua_CFunction; ud : Pointer) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function  lua_load(L : Plua_State; reader : lua_Reader;
-                   dt : Pointer; const chunkname : PChar) : Integer;
-  cdecl; external LuaDLL;
+                   dt : Pointer; chunkname : PChar) : Integer;
+  extdecl; external LuaDLL;
 
 function lua_dump(L : Plua_State; writer : lua_Writer; data: Pointer) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 
 (*
 ** coroutine functions
 *)
 function lua_yield(L : Plua_State; nresults : Integer) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_resume(L : Plua_State; narg : Integer) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_status(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 (*
 ** garbage-collection functions and options
@@ -412,24 +414,24 @@ const
   LUA_GCSETSTEPMUL = 7;
 
 function lua_gc(L : Plua_State; what, data : Integer) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 (*
 ** miscellaneous functions
 *)
 function lua_error(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function lua_next(L : Plua_State; idx : Integer) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 procedure lua_concat(L : Plua_State; n : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function  lua_getallocf(L : Plua_State; ud : PPointer) : lua_Alloc;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure lua_setallocf(L : Plua_State; f : lua_Alloc; ud : Pointer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 (*
 ** ===============================================================
@@ -520,37 +522,37 @@ type
   Plua_Debug = ^lua_Debug;
 
   (* Functions to be called by the debuger in specific events *)
-  lua_Hook = procedure (L : Plua_State; ar : Plua_Debug); cdecl;
+  lua_Hook = procedure (L : Plua_State; ar : Plua_Debug); extdecl;
 
 
 function lua_getstack(L : Plua_State; level : Integer;
                       ar : Plua_Debug) : Integer;
-  cdecl; external LuaDLL;
-function lua_getinfo(L : Plua_State; const what : PChar;
+  extdecl; external LuaDLL;
+function lua_getinfo(L : Plua_State; what : PChar;
                      ar: Plua_Debug): Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_getlocal(L : Plua_State;
                       ar : Plua_Debug; n : Integer) : PChar;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_setlocal(L : Plua_State;
                       ar : Plua_Debug; n : Integer) : PChar;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_getupvalue(L : Plua_State; funcindex, n : Integer) : PChar;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_setupvalue(L : Plua_State; funcindex, n : Integer) : PChar;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function lua_sethook(L : Plua_State; func : lua_Hook;
                      mask, count: Integer): Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 {
 function lua_gethook(L : Plua_State) : lua_Hook;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 }
 function lua_gethookmask(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function lua_gethookcount(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 
 (*****************************************************************************)
@@ -577,31 +579,31 @@ const
   LUA_LOADLIBNAME = 'package';
 
 function luaopen_base(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function luaopen_table(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function luaopen_io(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function luaopen_os(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function luaopen_string(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function luaopen_math(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function luaopen_debug(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function luaopen_package(L : Plua_State) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 procedure luaL_openlibs(L : Plua_State);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 procedure lua_assert(x : Boolean);    // a macro
 
@@ -631,87 +633,87 @@ type
   PluaL_Reg = ^luaL_Reg;
 
 
-procedure luaL_openlib(L : Plua_State; const libname : PChar;
-                       const lr : PluaL_Reg; nup : Integer);
-  cdecl; external LuaDLL;
-procedure luaL_register(L : Plua_State; const libname : PChar;
-                       const lr : PluaL_Reg);
-  cdecl; external LuaDLL;
+procedure luaL_openlib(L : Plua_State; libname : PChar;
+                       lr : PluaL_Reg; nup : Integer);
+  extdecl; external LuaDLL;
+procedure luaL_register(L : Plua_State; libname : PChar;
+                       lr : PluaL_Reg);
+  extdecl; external LuaDLL;
 function luaL_getmetafield(L : Plua_State; obj : Integer;
-                           const e : PChar) : Integer;
-  cdecl; external LuaDLL;
+                           e : PChar) : Integer;
+  extdecl; external LuaDLL;
 function luaL_callmeta(L : Plua_State; obj : Integer;
-                       const e : PChar) : Integer;
-  cdecl; external LuaDLL;
+                       e : PChar) : Integer;
+  extdecl; external LuaDLL;
 function luaL_typerror(L : Plua_State; narg : Integer;
-                       const tname : PChar) : Integer;
-  cdecl; external LuaDLL;
+                       tname : PChar) : Integer;
+  extdecl; external LuaDLL;
 function luaL_argerror(L : Plua_State; numarg : Integer;
-                       const extramsg : PChar) : Integer;
-  cdecl; external LuaDLL;
+                       extramsg : PChar) : Integer;
+  extdecl; external LuaDLL;
 function luaL_checklstring(L : Plua_State; numArg : Integer;
                            ls : Psize_t) : PChar;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function luaL_optlstring(L : Plua_State; numArg : Integer;
-                         const def: PChar; ls: Psize_t) : PChar;
-  cdecl; external LuaDLL;
+                         def: PChar; ls: Psize_t) : PChar;
+  extdecl; external LuaDLL;
 function luaL_checknumber(L : Plua_State; numArg : Integer) : lua_Number;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function luaL_optnumber(L : Plua_State; nArg : Integer;
                         def : lua_Number) : lua_Number;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 function luaL_checkinteger(L : Plua_State; numArg : Integer) : lua_Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function luaL_optinteger(L : Plua_State; nArg : Integer;
                         def : lua_Integer) : lua_Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
-procedure luaL_checkstack(L : Plua_State; sz : Integer; const msg : PChar);
-  cdecl; external LuaDLL;
+procedure luaL_checkstack(L : Plua_State; sz : Integer; msg : PChar);
+  extdecl; external LuaDLL;
 procedure luaL_checktype(L : Plua_State; narg, t : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure luaL_checkany(L : Plua_State; narg : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
-function luaL_newmetatable(L : Plua_State; const tname : PChar) : Integer;
-  cdecl; external LuaDLL;
+function luaL_newmetatable(L : Plua_State; tname : PChar) : Integer;
+  extdecl; external LuaDLL;
 function luaL_checkudata(L : Plua_State; ud : Integer;
-                         const tname : PChar) : Pointer;
-  cdecl; external LuaDLL;
+                         tname : PChar) : Pointer;
+  extdecl; external LuaDLL;
 
 procedure luaL_where(L : Plua_State; lvl : Integer);
-  cdecl; external LuaDLL;
-function  luaL_error(L : Plua_State; const fmt : PChar) : Integer; varargs;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
+function  luaL_error(L : Plua_State; fmt : PChar) : Integer; varargs;
+  extdecl; external LuaDLL;
 
-function luaL_checkoption(L : Plua_State; narg : Integer; const def : PChar;
-                          const lst : array of PChar) : Integer;
-  cdecl; external LuaDLL;
+function luaL_checkoption(L : Plua_State; narg : Integer; def : PChar;
+                          lst : array of PChar) : Integer;
+  extdecl; external LuaDLL;
 
 function  luaL_ref(L : Plua_State; t : Integer) : Integer;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure luaL_unref(L : Plua_State; t, ref : Integer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
-function luaL_loadfile(L : Plua_State; const filename : PChar) : Integer;
-  cdecl; external LuaDLL;
-function luaL_loadbuffer(L : Plua_State; const buff : PChar;
-                         sz : size_t; const name: PChar) : Integer;
-  cdecl; external LuaDLL;
+function luaL_loadfile(L : Plua_State; filename : PChar) : Integer;
+  extdecl; external LuaDLL;
+function luaL_loadbuffer(L : Plua_State; buff : PChar;
+                         sz : size_t; name: PChar) : Integer;
+  extdecl; external LuaDLL;
 
-function luaL_loadstring(L : Plua_State; const s : Pchar) : Integer;
-  cdecl; external LuaDLL;
+function luaL_loadstring(L : Plua_State; s : Pchar) : Integer;
+  extdecl; external LuaDLL;
 
 function luaL_newstate : Plua_State;
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
-function luaL_gsub(L : Plua_State; const s, p, r : PChar) : PChar;
-  cdecl; external LuaDLL;
+function luaL_gsub(L : Plua_State; s, p, r : PChar) : PChar;
+  extdecl; external LuaDLL;
 
 function luaL_findtable(L : Plua_State; idx : Integer;
-                        const fname : PChar; szhint : Integer) : PChar;
-  cdecl; external LuaDLL;
+                        fname : PChar; szhint : Integer) : PChar;
+  extdecl; external LuaDLL;
 
 
 (*
@@ -764,17 +766,17 @@ procedure luaL_putchar(B : PluaL_Buffer; c : Char);
 procedure luaL_addsize(B : PluaL_Buffer; n : Integer);
 
 procedure luaL_buffinit(L : Plua_State; B : PluaL_Buffer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 function  luaL_prepbuffer(B : PluaL_Buffer) : PChar;
-  cdecl; external LuaDLL;
-procedure luaL_addlstring(B : PluaL_Buffer; const s : PChar; ls : size_t);
-  cdecl; external LuaDLL;
-procedure luaL_addstring(B : PluaL_Buffer; const s : PChar);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
+procedure luaL_addlstring(B : PluaL_Buffer; s : PChar; ls : size_t);
+  extdecl; external LuaDLL;
+procedure luaL_addstring(B : PluaL_Buffer; s : PChar);
+  extdecl; external LuaDLL;
 procedure luaL_addvalue(B : PluaL_Buffer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 procedure luaL_pushresult(B : PluaL_Buffer);
-  cdecl; external LuaDLL;
+  extdecl; external LuaDLL;
 
 (* ====================================================== *)
 
@@ -1097,4 +1099,3 @@ end;
 ******************************************************************************)
 
 end.
-

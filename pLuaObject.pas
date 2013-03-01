@@ -5,6 +5,8 @@ unit pLuaObject;
 {$TYPEDADDRESS ON}
 {$ENDIF}
 
+{$I pLua.inc}
+
 interface
 
 uses
@@ -257,9 +259,9 @@ begin
   Result:=S.LuaObjects.Count;
 end;
 
-function plua_gc_class(l : PLua_State) : integer; cdecl; forward;
+function plua_gc_class(l : PLua_State) : integer; extdecl; forward;
 
-function plua_index_class(l : PLua_State) : integer; cdecl;
+function plua_index_class(l : PLua_State) : integer; extdecl;
 var
   propName : AnsiString;
   propValueStart : Integer;
@@ -300,7 +302,7 @@ begin
     end;
 end;
 
-function plua_newindex_class(l : PLua_State) : integer; cdecl;
+function plua_newindex_class(l : PLua_State) : integer; extdecl;
 var
   propName : AnsiString;
   propValueStart : Integer;
@@ -362,7 +364,7 @@ begin
 end;
 
 {$IMPLICITEXCEPTIONS OFF}
-function plua_call_class_method(l : PLua_State) : integer; cdecl;
+function plua_call_class_method(l : PLua_State) : integer; extdecl;
 var
   exc_message:PChar;
   curtop : Integer;
@@ -389,7 +391,7 @@ begin
 end;
 {$IMPLICITEXCEPTIONS ON}
 
-function plua_new_class(l : PLua_State) : integer; cdecl;
+function plua_new_class(l : PLua_State) : integer; extdecl;
 var
   i, n, tidx, midx, oidx : Integer;
   classId : TLuaClassId;
@@ -436,7 +438,7 @@ begin
   result := 1;
 end;
 
-function plua_gc_class(l : PLua_State) : integer; cdecl;
+function plua_gc_class(l : PLua_State) : integer; extdecl;
 var
   nfo : PLuaInstanceInfo;
   d   : TLuaObjectEventDelegate;

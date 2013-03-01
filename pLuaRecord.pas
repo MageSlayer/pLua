@@ -5,6 +5,8 @@ unit pLuaRecord;
 {$TYPEDADDRESS ON}
 {$ENDIF}
 
+{$I pLua.inc}
+
 interface
 
 uses
@@ -146,9 +148,9 @@ begin
   Result:=cinfo^.RecordName+'_mt';
 end;
 
-function plua_gc_record(l : PLua_State) : integer; cdecl; forward;
+function plua_gc_record(l : PLua_State) : integer; extdecl; forward;
 
-function plua_index_record(l : PLua_State) : integer; cdecl;
+function plua_index_record(l : PLua_State) : integer; extdecl;
 var
   propName : AnsiString;
   propValueStart : Integer;
@@ -175,7 +177,7 @@ begin
     result := reader(rec, l, propValueStart, pcount);
 end;
 
-function plua_newindex_record(l : PLua_State) : integer; cdecl;
+function plua_newindex_record(l : PLua_State) : integer; extdecl;
 var
   propName : AnsiString;
   propValueStart : Integer;
@@ -211,7 +213,7 @@ begin
     end;
 end;
 
-function plua_new_record(l : PLua_State) : integer; cdecl;
+function plua_new_record(l : PLua_State) : integer; extdecl;
 var
   n, tidx,
   oidx    : Integer;
@@ -283,7 +285,7 @@ begin
     end;
 end;
 
-function plua_gc_record(l : PLua_State) : integer; cdecl;
+function plua_gc_record(l : PLua_State) : integer; extdecl;
 var
   nfo : PLuaRecordInstanceInfo;
   Lua : TLuaInternalState;
