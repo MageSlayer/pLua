@@ -820,7 +820,7 @@ begin
     end
     else
     begin
-      LogDebug('plua_pushexisting. Object $%x', [PtrUint(ObjectInstance)]);
+      LogDebug('plua_pushexisting. Object $%P', [Pointer(ObjectInstance)]);
 
       Lua:=LuaSelf(l);
 
@@ -863,7 +863,7 @@ begin
       lua_rawgeti(Result^.l, LUA_REGISTRYINDEX, Result^.LuaRef);
     end;
 
-  LogDebug('plua_pushexisting. Object $%x. LuaRef=%d', [ PtrUint(ObjectInstance), Result^.LuaRef ]);
+  LogDebug('plua_pushexisting. Object $%P. LuaRef=%d', [ Pointer(ObjectInstance), Result^.LuaRef ]);
 
   plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
 end;
@@ -883,7 +883,7 @@ var objinfo:PLuaInstanceInfo;
 begin
   objinfo := plua_GetObjectInfo(l, ObjectInstance);
   if objinfo = nil then
-     raise LuaException.CreateFmt('Object $%x does not have object info', [PtrUint(ObjectInstance)]);
+     raise LuaException.CreateFmt('Object $%P does not have object info', [Pointer(ObjectInstance)]);
 
   //remove reference
   Result:=plua_ref_release(l, objinfo);
@@ -898,7 +898,7 @@ begin
   if assigned(ObjectInfo) then
     begin
       if ObjectInfo^.LuaRef = LUA_NOREF then
-         raise LuaException.CreateFmt('Object $%x does not have Lua ref. Can'' push it on stack', [PtrUint(ObjectInfo^.obj)]);
+         raise LuaException.CreateFmt('Object $%P does not have Lua ref. Can'' push it on stack', [Pointer(ObjectInfo^.obj)]);
 
       lua_rawgeti(ObjectInfo^.l, LUA_REGISTRYINDEX, ObjectInfo^.LuaRef);
       result := true;

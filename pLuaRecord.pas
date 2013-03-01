@@ -398,7 +398,7 @@ var objinfo:PLuaRecordInstanceInfo;
 begin
   objinfo := plua_getRecordInfo(l, RecordPointer);
   if objinfo = nil then
-     raise LuaException.CreateFmt('Object $%x does not have record info', [PtrUInt(RecordPointer)]);
+     raise LuaException.CreateFmt('Object $%P does not have record info', [Pointer(RecordPointer)]);
 
   //remove reference
   plua_ref_release(l, objinfo);
