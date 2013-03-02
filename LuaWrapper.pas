@@ -394,7 +394,7 @@ begin
 end;
 
 procedure TLUA.ExecuteAsFunctionStrList(const Script: string; ResultTable:TStrings) ;
-var Val:PChar;
+var Val:string;
     StartTop, idx:integer;
 begin
   ResultTable.Create;
@@ -418,9 +418,9 @@ begin
              raise LuaException.Create('ExecuteAsFunctionStrList requires to be all table values to be strings');
 
            // key is at index -2 and value at index -1
-           Val:= lua_tostring(L, -1);
-           if Val <> nil then
-             ResultTable.Add( String(Val) );
+           Val:= plua_tostring(L, -1);
+           if Val <> '' then
+             ResultTable.Add( Val );
 
            lua_pop(L, 1);  // removes value; keeps key for next iteration
         end;
