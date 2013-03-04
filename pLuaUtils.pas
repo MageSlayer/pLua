@@ -10,6 +10,7 @@ uses Classes, SysUtils,
 procedure plua_fs_register(L:Plua_State);
 
 implementation
+uses gstack;
 
 const
   Package_fs = 'fs';
@@ -17,57 +18,55 @@ const
 const
   AllMask = {$IFDEF WINDOWS}'*.*'{$ELSE}'*'{$ENDIF};
 
-procedure FindFilesToList(const Dir, WildCard:string; Recursive:boolean; L:TStrings);
-
-procedure ProcessDir(const Dir:string);
-var SR:TSearchRec;
-    Found:Integer;
-begin
-  //first pass - directories
-  if Recursive then
-    begin
-      Found:=FindFirst(Dir + DirectorySeparator + AllMask, faDirectory, SR);
-      try
-        while Found = 0 do
-        with SR do
-        begin
-          if (Name <> '.') and (Name <> '..') then
-            if Attr and faDirectory > 0 then
-              begin
-                if Recursive then
-                   ProcessDir(Dir + DirectorySeparator + Name);
-              end;
-          Found:=FindNext(SR);
-        end;
-      finally
-        FindClose(SR);
-      end;
-    end;
-
-  //second pass - files
-  Found:=FindFirst(Dir + DirectorySeparator + WildCard, faAnyFile, SR);
-  try
-    while Found = 0 do
-    with SR do
-    begin
-      if (Name <> '.') and (Name <> '..') then
-         begin
-           if Attr and faDirectory = 0 then
-             begin
-               L.Add(Dir + DirectorySeparator + Name);
-             end;
-         end;
-
-      Found:=FindNext(SR);
-    end;
-  finally
-    FindClose(SR);
+type
+  TFindFilesIteratorParams = record
+    Dir, WildCard:string;
+    Recursive:boolean
   end;
-end;
 
+  { TFindFilesIterator }
+
+  TFindFilesIteratorState = (stInit, stFindDirectoriesLoop, stFindDirectoriesNext, stFindFiles, stFindFilesLoop, stFindFilesNext, stComplete);
+  TFindFilesIteratorStackFrame = record
+    SR:TSearchRec;
+    Dir:string;
+    State:TFindFilesIteratorState;
+  end;
+  PFindFilesIteratorStackFrame = ^TFindFilesIteratorStackFrame;
+  TFindFilesIteratorStack = specialize TStack<PFindFilesIteratorStackFrame>;
+
+  TFindFilesIterator = class
+    private
+      FParams:TFindFilesIteratorParams;
+      FStack:TFindFilesIteratorStack;
+
+      procedure Clear;
+      function ProcessDir: string;
+      procedure PushFrame(const Dir:string);
+      procedure PopFrame(Force: boolean=False);
+    public
+      constructor Create(const Dir, WildCard:string; Recursive:boolean);
+      destructor Destroy;override;
+
+      function FetchNext:string;
+  end;
+
+procedure FindFilesToList(const Dir, WildCard:string; Recursive:boolean; L:TStrings);
+var Iter:TFindFilesIterator;
+    f:string;
 begin
   L.Clear;
-  ProcessDir(Dir);
+  Iter:=TFindFilesIterator.Create(Dir, WildCard, Recursive);
+  try
+    while true do
+    begin
+      f:=Iter.FetchNext;
+      if f = '' then break;
+      L.Add(f);
+    end;
+  finally
+    Iter.Free;
+  end;
 end;
 
 procedure FindFilesArgs(l : Plua_State; paramcount: Integer;
@@ -120,6 +119,158 @@ procedure plua_fs_register(L: Plua_State);
 begin
   plua_RegisterMethod(l, Package_fs, 'findfiles', @plua_findfiles);
   plua_RegisterMethod(l, Package_fs, 'iterfiles', @plua_iterfiles);
+end;
+
+{ TFindFilesIterator }
+
+procedure TFindFilesIterator.Clear;
+begin
+  while not FStack.IsEmpty do
+  begin
+    PopFrame;
+  end;
+end;
+
+constructor TFindFilesIterator.Create(const Dir, WildCard: string;
+  Recursive: boolean);
+var F:TFindFilesIteratorStackFrame;
+begin
+  FStack:=TFindFilesIteratorStack.Create;
+
+  FParams.Dir:=Dir;
+  FParams.WildCard:=WildCard;
+  FParams.Recursive:=Recursive;
+
+  PushFrame(Dir);
+end;
+
+destructor TFindFilesIterator.Destroy;
+begin
+  Clear;
+  FStack.Free;
+  inherited Destroy;
+end;
+
+procedure TFindFilesIterator.PushFrame(const Dir: string);
+var F:PFindFilesIteratorStackFrame;
+begin
+  New(F);
+  F^.Dir:=Dir;
+  F^.State:=stInit;
+  FillByte(F^.SR, SizeOf(F^.SR), 0);
+  FStack.Push(F);
+end;
+
+procedure TFindFilesIterator.PopFrame(Force:boolean=False);
+var Frame:PFindFilesIteratorStackFrame;
+begin
+  Frame:=FStack.Top();
+
+  if Force or not (Frame^.State in [stInit, stComplete]) then
+    FindClose(Frame^.SR);
+
+  Dispose(Frame);
+  FStack.Pop();
+end;
+
+function TFindFilesIterator.ProcessDir:string;
+label
+  NextIter;
+var Found:Integer;
+    Frame:PFindFilesIteratorStackFrame;
+begin
+
+NextIter:
+  Result:='';
+  Frame:=FStack.Top();
+
+  while true do
+  case Frame^.State of
+    stInit:
+      begin
+        //first pass - directories
+        Frame^.State:=stFindFiles;
+        if FParams.Recursive then
+          begin
+            Found:=FindFirst(Frame^.Dir + DirectorySeparator + AllMask, faDirectory, Frame^.SR);
+            if Found = 0 then
+              Frame^.State:=stFindDirectoriesLoop;
+          end;
+      end;
+
+    stFindDirectoriesLoop:
+      begin
+        Frame^.State:=stFindDirectoriesNext;
+        with Frame^.SR do
+        begin
+          if (Name <> '.') and (Name <> '..') then
+            if (Attr and faDirectory) > 0 then
+              begin
+                PushFrame(Frame^.Dir + DirectorySeparator + Name);
+                goto NextIter;
+              end;
+        end;
+      end;
+
+    stFindDirectoriesNext:
+      begin
+        Found:=FindNext(Frame^.SR);
+        if Found = 0 then
+          Frame^.State:=stFindDirectoriesLoop
+          else
+          begin
+            FindClose(Frame^.SR);
+            Frame^.State:=stFindFiles;
+          end;
+      end;
+
+    stFindFiles:
+      begin
+        //second pass - files
+        Found:=FindFirst(Frame^.Dir + DirectorySeparator + FParams.WildCard, faAnyFile, Frame^.SR);
+        if Found = 0 then
+          Frame^.State:=stFindFilesLoop
+          else
+          Frame^.State:=stComplete;
+      end;
+
+    stFindFilesLoop:
+      begin
+        Frame^.State:=stFindFilesNext;
+
+        with Frame^.SR do
+        begin
+          if (Name <> '.') and (Name <> '..') then
+            if (Attr and faDirectory) = 0 then
+              begin
+                Result:=Frame^.Dir + DirectorySeparator + Name;
+                break;
+              end;
+        end;
+      end;
+
+    stFindFilesNext:
+      begin
+        Found:=FindNext(Frame^.SR);
+        if Found = 0 then
+          Frame^.State:=stFindFilesLoop
+          else
+          Frame^.State:=stComplete;
+      end;
+
+    stComplete:
+      begin
+        PopFrame(True);
+        if FStack.IsEmpty() then
+          break;
+        goto NextIter;
+      end;
+   end;
+end;
+
+function TFindFilesIterator.FetchNext: string;
+begin
+  Result:=ProcessDir;
 end;
 
 end.
