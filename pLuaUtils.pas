@@ -14,8 +14,10 @@ implementation
 const
   Package_fs = 'fs';
 
+const
+  AllMask = {$IFDEF WINDOWS}'*.*'{$ELSE}'*'{$ENDIF};
+
 procedure FindFilesToList(const Dir, WildCard:string; Recursive:boolean; L:TStrings);
-var AllMask:string;
 
 procedure ProcessDir(const Dir:string);
 var SR:TSearchRec;
@@ -65,8 +67,29 @@ end;
 
 begin
   L.Clear;
-  AllMask:={$IFDEF WINDOWS}'*.*'{$ELSE}'*'{$ENDIF};
   ProcessDir(Dir);
+end;
+
+procedure FindFilesArgs(l : Plua_State; paramcount: Integer;
+                        out Dir:string; out Recursive:boolean; out Mask:string );
+begin
+  if not (paramcount in [2,3]) then
+     lua_reporterror(l, 'Dir, Recursive, [Mask] are expected.');
+
+  if paramcount < 3 then
+    begin
+      Mask:=AllMask;
+    end
+    else
+    begin
+      Mask:=plua_tostring(l, -1);
+      lua_pop(l, 1);
+    end;
+  Recursive:=lua_toboolean(l, -1);
+  lua_pop(l, 1);
+
+  Dir:=plua_tostring(l, -1);
+  lua_pop(l, 1);
 end;
 
 function plua_findfiles(l : PLua_State; paramcount: Integer) : integer;
@@ -75,22 +98,10 @@ var S:TStringList;
     Dir, Mask:string;
 begin
   Result:=0;
-  if not (paramcount in [2,3]) then
-     lua_reporterror(l, 'Dir, Recursive, [Mask] are expected.');
+  FindFilesArgs(l, paramcount, Dir, Recursive, Mask);
 
   S:=TStringList.Create;
   try
-    if paramcount = 3 then
-       begin
-         Mask:=plua_tostring(l, -1);
-         lua_pop(l, 1);
-       end;
-    Recursive:=lua_toboolean(l, -1);
-    lua_pop(l, 1);
-
-    Dir:=plua_tostring(l, -1);
-    lua_pop(l, 1);
-
     FindFilesToList(Dir, Mask, Recursive, S);
 
     plua_pushstrings(l, S);
