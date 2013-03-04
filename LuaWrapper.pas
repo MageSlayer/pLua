@@ -21,9 +21,6 @@ uses
 type
   TLua = class;
 
-  //function type which supports native Pascal exception handling
-  TLuaProc = function (l : PLua_State; paramcount: Integer) : integer;
-
   TLuaOnException = procedure( Title: ansistring; Line: Integer; Msg: ansistring;
                                var handled : Boolean) {$IFDEF TLuaHandlersAsIsObjectType}of object{$ENDIF};
   TLuaOnLoadLibs  = procedure( LuaWrapper : TLua ) {$IFDEF TLuaHandlersAsIsObjectType}of object{$ENDIF};
@@ -115,7 +112,7 @@ type
     function  FunctionExists(aMethodName:AnsiString) : Boolean;
     function  CallFunction( FunctionName :AnsiString; const Args: array of Variant;
                             Results : PVariantArray = nil):Integer;
-    function  TableExists(const TableName):boolean;
+    function  TableExists(const TableName:string):boolean;
     function  TableFunctionExists(TableName, FunctionName : AnsiString; out tblidx : Integer) : Boolean; overload;
     function  TableFunctionExists(TableName, FunctionName : AnsiString) : Boolean; overload;
     function  CallTableFunction( TableName, FunctionName :AnsiString;
@@ -578,91 +575,20 @@ begin
     FMethods.Objects[FMethods.IndexOf(aMethodName)] := TObject(@Func);
 end;
 
-function plua_call_method_except_wrapper(l : PLua_State; out exc_message:pchar) : integer;
-var
-  method : TLuaProc;
-  pcount : Integer;
-begin
-  result := 0;
-  exc_message:=nil;
-  try
-    pcount := lua_gettop(l);
-    method := TLuaProc(lua_topointer(l, lua_upvalueindex(1)));
-
-    if assigned(method) then
-      result := method(l, pcount);
-  except
-    on E:Exception do
-      begin
-        exc_message:=StrToPChar(E.Message);
-      end;
-  end;
-end;
-
-{$IMPLICITEXCEPTIONS OFF}
-function plua_call_method(l : PLua_State) : integer; extdecl;
-var
-  exc_message:PChar;
-  curtop : Integer;
-begin
-  {
-    Using lua_error in functions having automatically-generated "finally" code causes access violations.
-    So all exceptions are caught in plua_call_class_method_except_wrapper function and
-    returned as a simple PChar strings to avoid any automatic release.
-    This function forcibly lacks "finally" code - {$IMPLICITEXCEPTIONS OFF}
-  }
-  Result:=plua_call_method_except_wrapper(l, exc_message);
-
-  if exc_message <> nil then
-    begin
-      Result:=0;
-      curtop:=lua_gettop(l);
-      lua_pop(l, curtop); //remove both parameters and any non-complete return values.
-
-      lua_pushstring(L, exc_message);
-      StrDispose(exc_message);
-
-      lua_error(L); //does longjmp, almost the same as exception raising
-    end;
-end;
-{$IMPLICITEXCEPTIONS ON}
-
 procedure TLUA.RegisterLuaMethod(const aMethodName: AnsiString; Func: TLuaProc);
 begin
   if L = nil then
     Open;
 
-  plua_pushstring(L, aMethodName);
-  lua_pushlightuserdata(l, Pointer(Func));
-  lua_pushcclosure(L, @plua_call_method, 1);
-  lua_rawset(l, LUA_GLOBALSINDEX);
+  plua_RegisterMethod(l, aMethodName, Func);
 end;
 
 procedure TLUA.RegisterLuaMethod(const aPackage, aMethodName: AnsiString; Func: TLuaProc);
-var StartTop:Integer;
 begin
   if L = nil then
     Open;
 
-  StartTop:=lua_gettop(L);
-  try
-    if not TableExists(aPackage) then
-      begin
-        pLua_TableGlobalCreate(L, aPackage);
-      end;
-
-    //push aPackage table onto stack
-    plua_pushstring(L, aPackage);
-    lua_rawget(L, LUA_GLOBALSINDEX);
-
-    //write a method into aPackage table
-    plua_pushstring(L, aMethodName);
-    lua_pushlightuserdata(l, Pointer(Func));
-    lua_pushcclosure(L, @plua_call_method, 1);
-    lua_rawset(l, -3);
-  finally
-    plua_EnsureStackBalance(L, StartTop);
-  end;
+  plua_RegisterMethod(l, aPackage, aMethodName, Func);
 end;
 
 procedure TLUA.RegisterLuaTable(PropName: AnsiString; reader: lua_CFunction;
@@ -734,17 +660,9 @@ begin
   end;
 end;
 
-function TLUA.TableExists(const TableName): boolean;
-var StartTop:Integer;
+function TLUA.TableExists(const TableName:string): boolean;
 begin
-  StartTop:=lua_gettop(L);
-  try
-    lua_pushstring(L, PChar(TableName));
-    lua_rawget(L, LUA_GLOBALSINDEX);
-    result := lua_istable(L, -1);
-  finally
-    plua_EnsureStackBalance(L, StartTop);
-  end;
+  Result:=pLua_TableExists(l, TableName);
 end;
 
 procedure TLUA.Close;

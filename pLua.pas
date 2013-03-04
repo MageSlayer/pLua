@@ -5,6 +5,8 @@ unit pLua;
 {$modeswitch nestedprocvars}
 {$ENDIF}
 
+{$I pLua.inc}
+
 interface
 
 uses
@@ -17,6 +19,9 @@ type
 
   LuaException = class(Exception)
   end;
+
+  //function type which supports native Pascal exception handling
+  TLuaProc = function (l : PLua_State; paramcount: Integer) : integer;
 
 {$IFDEF LUAJIT}
   {$IFDEF CPU64}
@@ -60,11 +65,13 @@ function plua_callfunction( L: PLua_State; FunctionName : AnsiString;
                             ParamsToPush:TLuaParamPushProc = nil) : Integer;
 
 procedure plua_pushvariant( L : PLua_State; v : Variant);
+procedure plua_pushstrings( L : PLua_State; S : TStrings );
 
 function  plua_TableToVariantArray( L: Plua_State; Index: Integer;
                                     Keys : TStrings = nil) : variant;
 
 procedure pLua_TableGlobalCreate(L : Plua_State; const TableName:string);
+function pLua_TableExists(L : Plua_State; const TableName:string):boolean;
 
 function plua_tovariant(L: Plua_State; Index: Integer): Variant;
 
@@ -76,7 +83,9 @@ procedure plua_CopyTable(L: Plua_State; IdxFrom, IdxTo : Integer);
 
 procedure plua_RegisterMethod( l : Plua_State; aMethodName : AnsiString;
                                MethodPtr : lua_CFunction;
-                               totable : Integer = LUA_GLOBALSINDEX);
+                               totable : Integer = LUA_GLOBALSINDEX);overload;
+procedure plua_RegisterMethod(l : PLua_State; const aMethodName:string; Func:TLuaProc);overload;
+procedure plua_RegisterMethod(l : PLua_State; const aPackage, aMethodName:string; Func:TLuaProc);overload;
 
 procedure plua_GetTableKey( l : PLua_State; TableIndex : Integer; KeyName : AnsiString );
 
@@ -268,6 +277,18 @@ begin
   end;
 end;
 
+procedure plua_pushstrings(L: PLua_State; S: TStrings);
+var n:Integer;
+begin
+  lua_newtable(L);
+  for n := 0 to S.Count-1 do
+    begin
+      lua_pushinteger(L, n+1);
+      plua_pushstring(L, S.Strings[n]);
+      lua_settable(L, -3);
+    end;
+end;
+
 function  plua_TableToVariantArray( L: Plua_State; Index: Integer;
                                     Keys : TStrings = nil) : variant;
 var
@@ -308,6 +329,19 @@ begin
   plua_pushstring(l, TableName);
   lua_newtable(l);
   lua_settable(l, LUA_GLOBALSINDEX);
+end;
+
+function pLua_TableExists(L: Plua_State; const TableName: string): boolean;
+var StartTop:Integer;
+begin
+  StartTop:=lua_gettop(L);
+  try
+    lua_pushstring(L, PChar(TableName));
+    lua_rawget(L, LUA_GLOBALSINDEX);
+    result := lua_istable(L, -1);
+  finally
+    plua_EnsureStackBalance(L, StartTop);
+  end;
 end;
 
 function plua_tovariant(L: Plua_State; Index: Integer): Variant;
@@ -614,6 +648,87 @@ begin
 
       Log(Format('%s [%d] - value:%s, type:%s', [LogPrefix, n, val, plua_typename(l, luat)]) );
     end;
+end;
+
+function plua_call_method_except_wrapper(l : PLua_State; out exc_message:pchar) : integer;
+var
+  method : TLuaProc;
+  pcount : Integer;
+begin
+  result := 0;
+  exc_message:=nil;
+  try
+    pcount := lua_gettop(l);
+    method := TLuaProc(lua_topointer(l, lua_upvalueindex(1)));
+
+    if assigned(method) then
+      result := method(l, pcount);
+  except
+    on E:Exception do
+      begin
+        exc_message:=StrToPChar(E.Message);
+      end;
+  end;
+end;
+
+{$IMPLICITEXCEPTIONS OFF}
+function plua_call_method(l : PLua_State) : integer; extdecl;
+var
+  exc_message:PChar;
+  curtop : Integer;
+begin
+  {
+    Using lua_error in functions having automatically-generated "finally" code causes access violations.
+    So all exceptions are caught in plua_call_class_method_except_wrapper function and
+    returned as a simple PChar strings to avoid any automatic release.
+    This function forcibly lacks "finally" code - {$IMPLICITEXCEPTIONS OFF}
+  }
+  Result:=plua_call_method_except_wrapper(l, exc_message);
+
+  if exc_message <> nil then
+    begin
+      Result:=0;
+      curtop:=lua_gettop(l);
+      lua_pop(l, curtop); //remove both parameters and any non-complete return values.
+
+      lua_pushstring(L, exc_message);
+      StrDispose(exc_message);
+
+      lua_error(L); //does longjmp, almost the same as exception raising
+    end;
+end;
+{$IMPLICITEXCEPTIONS ON}
+
+procedure plua_RegisterMethod(l : PLua_State; const aMethodName:string; Func:TLuaProc);
+begin
+  plua_pushstring(L, aMethodName);
+  lua_pushlightuserdata(l, Pointer(Func));
+  lua_pushcclosure(L, @plua_call_method, 1);
+  lua_rawset(l, LUA_GLOBALSINDEX);
+end;
+
+procedure plua_RegisterMethod(l : PLua_State; const aPackage, aMethodName:string; Func:TLuaProc);
+var StartTop:Integer;
+begin
+  StartTop:=lua_gettop(L);
+  try
+    if not plua_TableExists(l, aPackage) then
+      begin
+        pLua_TableGlobalCreate(L, aPackage);
+      end;
+
+    //push aPackage table onto stack
+    plua_pushstring(L, aPackage);
+    lua_rawget(L, LUA_GLOBALSINDEX);
+
+    //write a method into aPackage table
+    plua_pushstring(L, aMethodName);
+    lua_pushlightuserdata(l, Pointer(Func));
+    lua_pushcclosure(L, @plua_call_method, 1);
+    lua_rawset(l, -3);
+  finally
+    plua_EnsureStackBalance(L, StartTop);
+  end;
 end;
 
 end.
