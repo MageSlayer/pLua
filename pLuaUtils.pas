@@ -2,6 +2,8 @@ unit pLuaUtils;
 
 {$mode objfpc}{$H+}
 
+{$I pLua.inc}
+
 interface
 uses Classes, SysUtils,
      Lua, pLua;
@@ -10,7 +12,7 @@ uses Classes, SysUtils,
 procedure plua_fs_register(L:Plua_State);
 
 implementation
-uses gstack;
+uses gstack, pLuaObject;
 
 const
   Package_fs = 'fs';
@@ -110,9 +112,58 @@ begin
   end;
 end;
 
-function plua_iterfiles(l : PLua_State; paramcount: Integer) : integer;
+function plua_findfiles_iterator(l : PLua_State) : integer; extdecl;
+var paramcount:Integer;
+    user_obj:^TObject;
+    f:String;
 begin
+  paramcount:=lua_gettop(l);
+  if paramcount <> 2 then
+    lua_reporterror(l, 'Invalid findfiles_iterator params');
 
+  //second param is not used actually
+  lua_pop(l, 1);
+
+  if not lua_isuserdata(l, -1) then
+    lua_reporterror(l, 'Invalid findfiles_iterator param1');
+
+  user_obj:=lua_touserdata(l, -1);
+  f:=TFindFilesIterator(user_obj^).FetchNext;
+
+  if f = '' then
+    lua_pushnil(l)
+    else
+    plua_pushstring(l, f);
+
+  Result:=1;
+end;
+
+function plua_iterfiles(l : PLua_State; paramcount: Integer) : integer;
+var Iter:TFindFilesIterator;
+    f:string;
+    Recursive:boolean;
+    Dir, Mask:string;
+begin
+  Result:=0;
+  FindFilesArgs(l, paramcount, Dir, Recursive, Mask);
+
+  Iter:=TFindFilesIterator.Create(Dir, Mask, Recursive);
+  f:=Iter.FetchNext;
+  if f = '' then
+    begin
+      FreeAndNil(Iter);
+      lua_pushnil(l);
+      lua_pushnil(l);
+      lua_pushnil(l);
+    end
+    else
+    begin
+      lua_pushcfunction(l, @plua_findfiles_iterator);
+      plua_PushObjectAsUserData(l, Iter);
+      plua_pushstring(l, f);
+    end;
+
+  Result:=3;
 end;
 
 procedure plua_fs_register(L: Plua_State);

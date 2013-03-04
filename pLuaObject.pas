@@ -189,6 +189,11 @@ function plua_pushexisting_special( l : PLua_State;
                             KeepRef:boolean = True //Reference keeps garbage collector from freeing object, until application decides to release it.
                                                    //If KeepRef is true, then application itself is responsible for freeing Lua object using pLua_ObjectMarkFree
                             ) : PLuaInstanceInfo;
+
+//Pushes class object as opaque userdata. Useful e.g. for iterators which are pushed by Pascal as userdata+finalizer
+//automatically calls Free on garbage collection
+procedure plua_PushObjectAsUserData(l: Plua_State; O:TObject);
+
 // only for freeing instances made by plua_pushexisting_special!
 procedure plua_instance_free(l: Plua_State; var Instance: PLuaInstanceInfo);
 
@@ -866,6 +871,29 @@ begin
   LogDebug('plua_pushexisting. Object $%P. LuaRef=%d', [ Pointer(ObjectInstance), Result^.LuaRef ]);
 
   plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
+end;
+
+function plua_gc_object_userdata(l : PLua_State) : integer; extdecl;
+var obj_user:^TObject;
+begin
+  obj_user:=lua_touserdata(l, -1);
+  obj_user^.Free;
+  result := 0;
+end;
+
+procedure plua_PushObjectAsUserData(l: Plua_State; O: TObject);
+var obj_user:^TObject;
+begin
+  obj_user:=lua_newuserdata(L, sizeof(obj_user^));
+  obj_user^:=O;
+
+  //attach metatable with finalizer
+  lua_newtable(L);
+  lua_pushstring(L, '__gc');
+  lua_pushcfunction(L, @plua_gc_object_userdata);
+  lua_rawset(L, -3);
+
+  lua_setmetatable(L, -2);
 end;
 
 procedure plua_instance_free(l: Plua_State; var Instance: PLuaInstanceInfo);
