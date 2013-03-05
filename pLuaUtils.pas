@@ -149,19 +149,14 @@ begin
 
   Iter:=TFindFilesIterator.Create(Dir, Mask, Recursive);
   f:=Iter.FetchNext;
+
+  lua_pushcfunction(l, @plua_findfiles_iterator);
+  plua_PushObjectAsUserData(l, Iter);
+
   if f = '' then
-    begin
-      FreeAndNil(Iter);
-      lua_pushnil(l);
-      lua_pushnil(l);
-      lua_pushnil(l);
-    end
+      lua_pushnil(l)
     else
-    begin
-      lua_pushcfunction(l, @plua_findfiles_iterator);
-      plua_PushObjectAsUserData(l, Iter);
       plua_pushstring(l, f);
-    end;
 
   Result:=3;
 end;
@@ -321,7 +316,9 @@ end;
 
 function TFindFilesIterator.FetchNext: string;
 begin
-  Result:=ProcessDir;
+  Result:='';
+  if not FStack.IsEmpty() then
+    Result:=ProcessDir;
 end;
 
 end.

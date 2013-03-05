@@ -883,7 +883,10 @@ end;
 
 procedure plua_PushObjectAsUserData(l: Plua_State; O: TObject);
 var obj_user:^TObject;
+    StartTop : Integer;
 begin
+  StartTop:=lua_gettop(l);
+
   obj_user:=lua_newuserdata(L, sizeof(obj_user^));
   obj_user^:=O;
 
@@ -894,6 +897,8 @@ begin
   lua_rawset(L, -3);
 
   lua_setmetatable(L, -2);
+
+  plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
 end;
 
 procedure plua_instance_free(l: Plua_State; var Instance: PLuaInstanceInfo);
