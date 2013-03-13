@@ -496,10 +496,16 @@ end;
 
 procedure plua_EnsureStackBalance(l: PLua_State; TopToBe: Integer);
 begin
-  while lua_gettop(l) > TopToBe do
-  begin
-    lua_pop(l, 1);
-  end;
+  if TopToBe < 0 then
+    begin
+      //if negative - means how many items must be popped from stack
+      lua_pop(l, -TopToBe);
+    end
+    else
+    while lua_gettop(l) > TopToBe do
+    begin
+      lua_pop(l, 1);
+    end;
 end;
 
 procedure plua_RaiseException(const ErrMes: string);
@@ -657,34 +663,42 @@ var
 begin
   result := 0;
   exc_message:=nil;
+  {$IFDEF CPU32}
   try
+  {$ENDIF}
     pcount := lua_gettop(l);
     method := TLuaProc(lua_topointer(l, lua_upvalueindex(1)));
 
     if assigned(method) then
       result := method(l, pcount);
+
+  {$IFDEF CPU32}
   except
     on E:Exception do
       begin
         exc_message:=StrToPChar(E.Message);
       end;
   end;
+  {$ENDIF}
 end;
 
+{$IFDEF CPU32}
 {$IMPLICITEXCEPTIONS OFF}
+{$ENDIF}
 function plua_call_method(l : PLua_State) : integer; extdecl;
 var
   exc_message:PChar;
   curtop : Integer;
 begin
   {
-    Using lua_error in functions having automatically-generated "finally" code causes access violations.
+    Using lua_error in functions having automatically-generated "finally" code causes access violations in 32-bit programs.
     So all exceptions are caught in plua_call_class_method_except_wrapper function and
     returned as a simple PChar strings to avoid any automatic release.
     This function forcibly lacks "finally" code - {$IMPLICITEXCEPTIONS OFF}
   }
   Result:=plua_call_method_except_wrapper(l, exc_message);
 
+  {$IFDEF CPU32}
   if exc_message <> nil then
     begin
       Result:=0;
@@ -696,8 +710,11 @@ begin
 
       lua_error(L); //does longjmp, almost the same as exception raising
     end;
+  {$ENDIF}
 end;
+{$IFDEF CPU32}
 {$IMPLICITEXCEPTIONS ON}
+{$ENDIF}
 
 procedure plua_RegisterMethod(l : PLua_State; const aMethodName:string; Func:TLuaProc);
 begin
