@@ -11,11 +11,15 @@ uses Classes, SysUtils,
 //fs namespace support
 procedure plua_fs_register(L:Plua_State);
 
+//dbg namespace support
+procedure plua_dbg_register(L:Plua_State);
+
 implementation
-uses gstack, pLuaObject;
+uses Forms, gstack, pLuaObject;
 
 const
   Package_fs = 'fs';
+  Package_dbg = 'dbg';
 
 const
   AllMask = {$IFDEF WINDOWS}'*.*'{$ELSE}'*'{$ENDIF};
@@ -161,10 +165,21 @@ begin
   Result:=3;
 end;
 
+function plua_process_messages(l : PLua_State; paramcount: Integer) : integer;
+begin
+  Application.ProcessMessages;
+  Result:=0;
+end;
+
 procedure plua_fs_register(L: Plua_State);
 begin
   plua_RegisterMethod(l, Package_fs, 'findfiles', @plua_findfiles);
   plua_RegisterMethod(l, Package_fs, 'iterfiles', @plua_iterfiles);
+end;
+
+procedure plua_dbg_register(L: Plua_State);
+begin
+  plua_RegisterMethod(l, Package_dbg, 'ProcessMessages', @plua_process_messages);
 end;
 
 { TFindFilesIterator }
