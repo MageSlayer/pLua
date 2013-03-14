@@ -22,14 +22,7 @@ type
 
   //function type which supports native Pascal exception handling
   TLuaProc = function (l : PLua_State; paramcount: Integer) : integer;
-
-{$IFDEF LUAJIT}
-  {$IFDEF CPU64}
-  //Currently only x64 exception natively by LuaJit itself
-  //other platform need try/except on Pascal->Lua boundary
-  {$DEFINE LUAJIT_EXCEPTION_SUPPORT}
-  {$ENDIF}
-{$ENDIF}
+  TLuaNakedProc = function (l : PLua_State) : integer;
 
 {$IFDEF LUA_LPEG} // as it links statically, not everybody can need it.
 const
@@ -96,9 +89,12 @@ procedure plua_CheckStackBalance(l: PLua_State; TopToBe:Integer; TypeOnTop:integ
 //pops all values from stack until stack is at TopToBe
 procedure plua_EnsureStackBalance(l: PLua_State; TopToBe:Integer);
 
+//pops all values from stack
+procedure plua_ClearStack(l: PLua_State);
+
 //Balance Lua stacka and throw exception
-procedure plua_RaiseException(const ErrMes:string);overload;
-procedure plua_RaiseException(const ErrMes:string; const Params:array of const);overload;
+procedure plua_RaiseException(l: PLua_State; const ErrMes:string);overload;
+procedure plua_RaiseException(l: PLua_State; const ErrMes:string; const Params:array of const);overload;
 procedure plua_RaiseException(l: PLua_State; TopToBe:Integer; const ErrMes:string);overload;
 procedure plua_RaiseException(l: PLua_State; TopToBe:Integer; const ErrMes:string; const Params:array of const);overload;
 
@@ -136,6 +132,7 @@ begin
   //LuaJit wants native exceptions, not longjmp!
   raise LuaException.Create(ErrMes);
   {$ELSE}
+  assert(L <> nil, 'Lua state is nil')
   lua_pushstring(L, PChar(ErrMes));
   lua_error(L); //does longjmp, almost the same as exception raising
   {$ENDIF}
@@ -496,32 +493,36 @@ end;
 
 procedure plua_EnsureStackBalance(l: PLua_State; TopToBe: Integer);
 begin
-  if TopToBe < 0 then
-    begin
-      //if negative - means how many items must be popped from stack
-      lua_pop(l, -TopToBe);
-    end
-    else
-    while lua_gettop(l) > TopToBe do
-    begin
-      lua_pop(l, 1);
-    end;
+  while lua_gettop(l) > TopToBe do
+  begin
+    lua_pop(l, 1);
+  end;
 end;
 
-procedure plua_RaiseException(const ErrMes: string);
+procedure plua_ClearStack(l: PLua_State);
+var
+  curtop : Integer;
 begin
-  raise LuaException.Create(ErrMes);
+  curtop:=lua_gettop(l);
+  if curtop > 0 then
+    lua_pop(l, curtop); //remove all stack values.
 end;
 
-procedure plua_RaiseException(const ErrMes: string; const Params: array of const);
+procedure plua_RaiseException(l: PLua_State; const ErrMes: string);
 begin
-  plua_RaiseException(Format(ErrMes, Params));
+  //raise LuaException.Create(ErrMes);
+  lua_reporterror(l, ErrMes);
+end;
+
+procedure plua_RaiseException(l: PLua_State; const ErrMes: string; const Params: array of const);
+begin
+  plua_RaiseException(l, Format(ErrMes, Params));
 end;
 
 procedure plua_RaiseException(l: PLua_State; TopToBe: Integer; const ErrMes: string);
 begin
-  plua_EnsureStackBalance(l, TopToBe);
-  plua_RaiseException(ErrMes);
+  if l <> nil then plua_EnsureStackBalance(l, TopToBe);
+  plua_RaiseException(l, ErrMes);
 end;
 
 procedure plua_RaiseException(l: PLua_State; TopToBe: Integer; const ErrMes: string;
@@ -656,65 +657,23 @@ begin
     end;
 end;
 
-function plua_call_method_except_wrapper(l : PLua_State; out exc_message:pchar) : integer;
+function plua_call_method_act(l : PLua_State) : integer;
 var
   method : TLuaProc;
   pcount : Integer;
 begin
   result := 0;
-  exc_message:=nil;
-  {$IFDEF CPU32}
-  try
-  {$ENDIF}
-    pcount := lua_gettop(l);
-    method := TLuaProc(lua_topointer(l, lua_upvalueindex(1)));
 
-    if assigned(method) then
-      result := method(l, pcount);
+  pcount := lua_gettop(l);
+  method := TLuaProc(lua_topointer(l, lua_upvalueindex(1)));
 
-  {$IFDEF CPU32}
-  except
-    on E:Exception do
-      begin
-        exc_message:=StrToPChar(E.Message);
-      end;
-  end;
-  {$ENDIF}
+  if assigned(method) then
+    result := method(l, pcount);
 end;
 
-{$IFDEF CPU32}
-{$IMPLICITEXCEPTIONS OFF}
-{$ENDIF}
-function plua_call_method(l : PLua_State) : integer; extdecl;
-var
-  exc_message:PChar;
-  curtop : Integer;
-begin
-  {
-    Using lua_error in functions having automatically-generated "finally" code causes access violations in 32-bit programs.
-    So all exceptions are caught in plua_call_class_method_except_wrapper function and
-    returned as a simple PChar strings to avoid any automatic release.
-    This function forcibly lacks "finally" code - {$IMPLICITEXCEPTIONS OFF}
-  }
-  Result:=plua_call_method_except_wrapper(l, exc_message);
-
-  {$IFDEF CPU32}
-  if exc_message <> nil then
-    begin
-      Result:=0;
-      curtop:=lua_gettop(l);
-      lua_pop(l, curtop); //remove both parameters and any non-complete return values.
-
-      lua_pushstring(L, exc_message);
-      StrDispose(exc_message);
-
-      lua_error(L); //does longjmp, almost the same as exception raising
-    end;
-  {$ENDIF}
-end;
-{$IFDEF CPU32}
-{$IMPLICITEXCEPTIONS ON}
-{$ENDIF}
+// exception support
+const pLuaExceptActual:TLuaNakedProc = @plua_call_method_act;
+{$I pLuaExceptWrapper.inc}
 
 procedure plua_RegisterMethod(l : PLua_State; const aMethodName:string; Func:TLuaProc);
 begin

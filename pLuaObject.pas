@@ -345,56 +345,25 @@ begin
   lua_pop(l, 2);
 end;
 
-function plua_call_class_method_except_wrapper(l : PLua_State; out exc_message:pchar) : integer;
+function plua_call_class_method_act(l : PLua_State) : integer;
 var
   method : plua_MethodWrapper;
   obj    : TObject;
   pcount : Integer;
 begin
   result := 0;
-  exc_message:=nil;
-  try
-    pcount := lua_gettop(l);
-    obj := plua_getObject(l, 1, False);
-    method := plua_MethodWrapper(lua_topointer(l, lua_upvalueindex(1)));
 
-    if assigned(obj) and assigned(method) then
-      result := method(obj, l, 2, pcount);
-  except
-    on E:Exception do
-      begin
-        exc_message:=StrToPChar(E.Message);
-      end;
-  end;
+  pcount := lua_gettop(l);
+  obj := plua_getObject(l, 1, False);
+  method := plua_MethodWrapper(lua_topointer(l, lua_upvalueindex(1)));
+
+  if assigned(obj) and assigned(method) then
+    result := method(obj, l, 2, pcount);
 end;
 
-{$IMPLICITEXCEPTIONS OFF}
-function plua_call_class_method(l : PLua_State) : integer; extdecl;
-var
-  exc_message:PChar;
-  curtop : Integer;
-begin
-  {
-    Using lua_error in functions having automatically-generated "finally" code causes access violations.
-    So all exceptions are caught in plua_call_class_method_except_wrapper function and
-    returned as a simple PChar strings to avoid any automatic release.
-    This function forcibly lacks "finally" code - {$IMPLICITEXCEPTIONS OFF}
-  }
-  Result:=plua_call_class_method_except_wrapper(l, exc_message);
-
-  if exc_message <> nil then
-    begin
-      Result:=0;
-      curtop:=lua_gettop(l);
-      lua_pop(l, curtop); //remove both parameters and any non-complete return values.
-
-      lua_pushstring(L, exc_message);
-      StrDispose(exc_message);
-
-      lua_error(L); //does longjmp, almost the same as exception raising
-    end;
-end;
-{$IMPLICITEXCEPTIONS ON}
+// exception support
+const pLuaExceptActual:TLuaNakedProc = @plua_call_class_method_act;
+{$I pLuaExceptWrapper.inc}
 
 function plua_new_class(l : PLua_State) : integer; extdecl;
 var
@@ -585,7 +554,7 @@ begin
             LogDebug('Registering class method %s.', [classInfo^.Methods[i].MethodName]);
             plua_pushstring(L, classInfo^.Methods[i].MethodName);
             lua_pushlightuserdata(l, Pointer(classInfo^.Methods[i].wrapper));
-            lua_pushcclosure(L, @plua_call_class_method, 1);
+            lua_pushcclosure(L, @plua_call_method, 1);
             lua_rawset(l, midx);
           end;
         LogDebug('Registering class methods - done.');

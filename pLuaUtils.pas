@@ -168,6 +168,7 @@ end;
 function plua_process_messages(l : PLua_State; paramcount: Integer) : integer;
 begin
   Application.ProcessMessages;
+  plua_EnsureStackBalance(l, 0);
   Result:=0;
 end;
 
