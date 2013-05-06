@@ -132,7 +132,7 @@ begin
   //LuaJit wants native exceptions, not longjmp!
   raise LuaException.Create(ErrMes);
   {$ELSE}
-  assert(L <> nil, 'Lua state is nil')
+  assert(L <> nil, 'Lua state is nil');
   lua_pushstring(L, PChar(ErrMes));
   lua_error(L); //does longjmp, almost the same as exception raising
   {$ENDIF}
