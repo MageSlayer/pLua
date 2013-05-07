@@ -1,6 +1,6 @@
 {$MACRO ON}
 
-{$DEFINE extdecl := stdcall}
+{$DEFINE extdecl := cdecl}
 
 //include user-defined defines
 {$I defines.inc}
