@@ -5,7 +5,13 @@ unit pLuaUtils;
 {$I pLua.inc}
 
 interface
-uses Classes, SysUtils,
+uses {$IFDEF LINUX}
+     BaseUnix
+     {$ENDIF}
+     {$IFDEF WINDOWS}
+     Windows
+     {$ENDIF}
+     , Classes, SysUtils,
      Lua, pLua;
 
 //fs namespace support
@@ -165,7 +171,144 @@ begin
   Result:=3;
 end;
 
-function plua_process_messages(l : PLua_State; paramcount: Integer) : integer;
+{$IFDEF WINDOWS}
+function FileTime2DateTime(FileTime: TFileTime): TDateTime;
+ var
+    LocalFileTime: TFileTime;
+    SystemTime: TSystemTime;
+ begin
+    FileTimeToLocalFileTime(FileTime, LocalFileTime) ;
+    FileTimeToSystemTime(LocalFileTime, SystemTime) ;
+    Result := SystemTimeToDateTime(SystemTime) ;
+ end;
+{$ENDIF}
+
+{
+a recent FPC (at least 2.7.1) is required to have FileAge working properly under Windows
+if not - uncomment following function.
+
+function FileAge(const FileName: string; out FileDateTime: TDateTime; FollowLink: Boolean = True): Boolean;
+Var
+  Info : TSearchRec;
+  A : Integer;
+begin
+  for A:=1 to Length(FileName) do
+    If (FileName[A] in ['?','*']) then
+      Exit(False);
+  A:=faAnyFile;  // <- fix for Windows is here
+  if Not FollowLink then
+    A:=A or faSymLink;
+  Result:=FindFirst(FileName,A,Info)=0;
+  If Result then
+    FileDateTime:=FileDatetoDateTime (Info.Time);
+  FindClose(Info);
+end;
+}
+
+function plua_file_time(l : PLua_State; paramcount: Integer) : integer;
+//returns creation and modification time for a file
+var Filename:string;
+    MTime, CTime:TDateTime;
+    {$IFDEF LINUX}
+    fstat:stat;
+    {$ENDIF}
+    {$IFDEF WINDOWS}
+    fl:TSearchRec;
+    {$ENDIF}
+begin
+  Result:=0;
+  if paramcount <> 1 then
+    lua_reporterror(l, 'Filename is expected.');
+
+  Filename:=plua_tostring(l, -1);
+  lua_pop(l, 1);
+
+  //modification time
+  if not FileAge(Filename, MTime, True) then
+    lua_reporterror(l, 'Error getting file modification time.');
+  lua_pushnumber(l, MTime);
+
+  //creation time
+  {$IFDEF LINUX}
+  if FpStat(Filename, {%H-}fstat)<>0 then
+    lua_reporterror(l, 'Error getting file creation time.');
+  CTime:=FileDatetoDateTime(fstat.st_ctime);
+  {$ENDIF}
+  {$IFDEF WINDOWS}
+  if FindFirst(FileName, faAnyFile, fl) <> 0 then
+    begin
+      FindClose(fl);
+      lua_reporterror(l, 'Error getting file creation time.');
+    end;
+  CTime:=FileTime2DateTime(fl.FindData.ftCreationTime);
+  FindClose(fl);
+  {$ENDIF}
+  lua_pushnumber(l, CTime);
+
+  Result:=2;
+end;
+
+function plua_file_size(l : PLua_State; paramcount: Integer) : integer;
+var S:int64;
+    Filename:string;
+    {$IFDEF LINUX}
+    fstat:stat;
+    {$ENDIF}
+    {$IFDEF WINDOWS}
+    fl:TSearchRec;
+    {$ENDIF}
+begin
+  Result:=0;
+
+  if paramcount <> 1 then
+    lua_reporterror(l, 'Filename is expected.');
+
+  Filename:=plua_tostring(l, -1);
+  lua_pop(l, 1);
+
+  {$IFDEF LINUX}
+  if FpStat(Filename, {%H-}fstat)<>0 then
+    lua_reporterror(l, 'Error getting file size.');
+  S:=fstat.st_size;
+  {$ENDIF}
+  {$IFDEF WINDOWS}
+  if FindFirst(FileName, faAnyFile, fl) <> 0 then
+    begin
+      FindClose(fl);
+      lua_reporterror(l, 'Error getting file size.');
+    end;
+  S:=((int64(fl.FindData.nFileSizeHigh)) shl 32) + fl.FindData.nFileSizeLow;
+  FindClose(fl);
+  {$ENDIF}
+  lua_pushnumber(l, S);
+
+  Result:=1;
+end;
+
+function plua_file_exists(l : PLua_State; paramcount: Integer) : integer;
+var S:int64;
+    Filename:string;
+    {$IFDEF LINUX}
+    fstat:stat;
+    {$ENDIF}
+    {$IFDEF WINDOWS}
+    fl:TSearchRec;
+    {$ENDIF}
+begin
+  Result:=0;
+
+  if paramcount <> 1 then
+    lua_reporterror(l, 'Filename is expected.');
+
+  Filename:=plua_tostring(l, -1);
+  lua_pop(l, 1);
+
+  lua_pushboolean(l, FileExists(FileName));
+
+  Result:=1;
+end;
+
+function plua_process_messages(l : PLua_State; {%H-}paramcount: Integer) : integer;
 begin
   Application.ProcessMessages;
   plua_EnsureStackBalance(l, 0);
@@ -176,6 +319,9 @@ procedure plua_fs_register(L: Plua_State);
 begin
   plua_RegisterMethod(l, Package_fs, 'findfiles', @plua_findfiles);
   plua_RegisterMethod(l, Package_fs, 'iterfiles', @plua_iterfiles);
+  plua_RegisterMethod(l, Package_fs, 'filetime', @plua_file_time);
+  plua_RegisterMethod(l, Package_fs, 'filesize', @plua_file_size);
+  plua_RegisterMethod(l, Package_fs, 'fileexists', @plua_file_exists);
 end;
 
 procedure plua_dbg_register(L: Plua_State);
@@ -195,7 +341,6 @@ end;
 
 constructor TFindFilesIterator.Create(const Dir, WildCard: string;
   Recursive: boolean);
-var F:TFindFilesIteratorStackFrame;
 begin
   FStack:=TFindFilesIteratorStack.Create;
 
