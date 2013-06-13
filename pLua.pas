@@ -104,7 +104,10 @@ function plua_FunctionCompile(l: PLua_State; const FuncCode:string):integer;over
 function plua_FunctionCompile(l: PLua_State; const FuncCode:string; const Substs:array of const):integer;overload;
 
 //report error from lua called functions
+//no need to balance stack if called from functions registered via plua_RegisterMethod
+//otherwise use plua_RaiseException
 procedure lua_reporterror(l : PLua_State; const ErrMes:string);
+procedure lua_reporterror(l : PLua_State; const ErrMes:string; const Params:array of const);
 
 var
   LogFunction             : procedure (const Text:string) = nil;
@@ -136,6 +139,11 @@ begin
   lua_pushstring(L, PChar(ErrMes));
   lua_error(L); //does longjmp, almost the same as exception raising
   {$ENDIF}
+end;
+
+procedure lua_reporterror(l: PLua_State; const ErrMes: string; const Params: array of const);
+begin
+  lua_reporterror(l, Format(ErrMes, Params));
 end;
 
 function plua_tostring(L: PLua_State; Index: Integer): ansistring;

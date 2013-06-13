@@ -308,6 +308,56 @@ begin
   Result:=1;
 end;
 
+function plua_file_slurp(l : PLua_State; paramcount: Integer) : integer;
+var Filename, S:string;
+    f:file;
+    FLen, FSize, BytesRead:int64;
+    Buf:array[0..65535] of byte;
+begin
+  Result:=0;
+
+  if paramcount <> 1 then
+    lua_reporterror(l, 'Filename is expected.');
+
+  Filename:=plua_tostring(l, -1);
+  lua_pop(l, 1);
+
+  if not FileExists(Filename) then
+    lua_reporterror(l, 'File %s does not exist.', [FileName]);
+
+
+  AssignFile(f, Filename);
+  try
+    Reset(f,1);
+
+    FLen:=FileSize(f);
+    SetLength(S, FLen);
+
+    FSize:=0;
+    repeat
+      BlockRead(f, Buf, SizeOf(Buf), BytesRead);
+      Inc(FSize, BytesRead);
+
+      if BytesRead <= 0 then break;
+
+      if FSize > Length(S) then
+        begin
+          SetLength(S, Length(S) + BytesRead*4);
+        end;
+
+      Move(Buf, (@S[FSize - BytesRead + 1])^, BytesRead);
+    until false;
+
+    SetLength(S, FSize);
+  finally
+    CloseFile(f);
+  end;
+
+  lua_pushlstring(l, PChar(S), FSize);
+
+  Result:=1;
+end;
+
 function plua_process_messages(l : PLua_State; {%H-}paramcount: Integer) : integer;
 begin
   Application.ProcessMessages;
@@ -322,6 +372,7 @@ begin
   plua_RegisterMethod(l, Package_fs, 'filetime', @plua_file_time);
   plua_RegisterMethod(l, Package_fs, 'filesize', @plua_file_size);
   plua_RegisterMethod(l, Package_fs, 'fileexists', @plua_file_exists);
+  plua_RegisterMethod(l, Package_fs, 'fileslurp', @plua_file_slurp);
 end;
 
 procedure plua_dbg_register(L: Plua_State);
