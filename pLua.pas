@@ -26,8 +26,13 @@ type
 
 {$IFDEF LUA_LPEG} // as it links statically, not everybody can need it.
 const
-  {$IFDEF WIN32}
+  {$IFDEF WINDOWS}
+    {$IFDEF CPU32}
     LpegLib = 'lpeg.dll'
+    {$ENDIF}
+    {$IFDEF CPU64}
+    LpegLib = 'lpeg-x64.dll'
+    {$ENDIF}
   {$ENDIF}
   {$IFDEF UNIX}
     LpegLib = 'liblpeg.so'
@@ -81,6 +86,9 @@ procedure plua_RegisterMethod(l : PLua_State; const aMethodName:string; Func:TLu
 procedure plua_RegisterMethod(l : PLua_State; const aPackage, aMethodName:string; Func:TLuaProc);overload;
 
 procedure plua_GetTableKey( l : PLua_State; TableIndex : Integer; KeyName : AnsiString );
+
+//parses full function name (with dots) into package + simple name
+procedure plua_FuncNameParse(const FuncName:String; out Package, FName:string);
 
 function plua_typename(l : Plua_State; luatype:Integer ):string;
 
@@ -230,7 +238,7 @@ begin
   if lua_isnil(L, -1) then
     raise LuaException.CreateFmt('Function %s not found', [FunctionName]);
 
-  if @ParamsToPush <> nil then
+  if ParamsToPush <> nil then
     begin
       NArgs:=ParamsToPush(l) - 1;
     end
@@ -476,6 +484,22 @@ begin
   TableIndex := plua_absindex(l, TableIndex);
   plua_pushstring(l, KeyName);
   lua_gettable(l, TableIndex);
+end;
+
+procedure plua_FuncNameParse(const FuncName: String; out Package, FName: string);
+var n:Integer;
+begin
+  n:=Pos('.', FuncName);
+  if n = 0 then
+    begin
+      Package:='';
+      FName:=FuncName;
+    end
+    else
+    begin
+      Package:=Copy(FuncName, 1, n-1);
+      FName  :=Copy(FuncName, n+1, Length(FuncName) - n);
+    end;
 end;
 
 function plua_typename(l: Plua_State; luatype: Integer): string;

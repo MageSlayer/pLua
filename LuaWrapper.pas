@@ -24,7 +24,7 @@ type
   TLuaOnException = procedure( Title: ansistring; Line: Integer; Msg: ansistring;
                                var handled : Boolean) {$IFDEF TLuaHandlersAsIsObjectType}of object{$ENDIF};
   TLuaOnLoadLibs  = procedure( LuaWrapper : TLua ) {$IFDEF TLuaHandlersAsIsObjectType}of object{$ENDIF};
-  
+
   { TLUA }
   TLUA=class{$IFDEF TLuaAsComponent}(TComponent){$ENDIF}
   private
@@ -110,7 +110,10 @@ type
     procedure RegisterLuaMethod(const aPackage, aMethodName: AnsiString; Func: TLuaProc);
 
     procedure RegisterLuaTable(PropName: AnsiString; reader: lua_CFunction; writer : lua_CFunction = nil);
-    function  FunctionExists(aMethodName:AnsiString) : Boolean;
+
+    function  FunctionExists(const aMethodName:AnsiString; TableIdx:Integer = LUA_GLOBALSINDEX) : Boolean;
+    function  FunctionExists(const Package, aMethodName: AnsiString): Boolean;
+
     function  CallFunction( FunctionName :AnsiString; const Args: array of Variant;
                             Results : PVariantArray = nil):Integer;
     function  TableExists(const TableName:string):boolean;
@@ -586,10 +589,24 @@ begin
   plua_CheckStackBalance(l, StartTop);
 end;
 
-function TLUA.FunctionExists(aMethodName: AnsiString): Boolean;
+function TLUA.FunctionExists(const Package, aMethodName: AnsiString): Boolean;
+var TopToBe, TableIdx:Integer;
+begin
+  TopToBe:=lua_gettop(l);
+  try
+    lua_pushstring(L, PChar(Package));
+    lua_gettable(L, LUA_GLOBALSINDEX);
+    TableIdx:=lua_gettop(l);
+    Result:=FunctionExists(aMethodName, TableIdx);
+  finally
+    plua_EnsureStackBalance(l, TopToBe);
+  end;
+end;
+
+function TLUA.FunctionExists(const aMethodName: AnsiString; TableIdx:Integer = LUA_GLOBALSINDEX): Boolean;
 begin
   lua_pushstring(L, PChar(aMethodName));
-  lua_rawget(L, LUA_GLOBALSINDEX);
+  lua_rawget(L, TableIdx);
   result := (not lua_isnil(L, -1)) and lua_isfunction(L, -1);
   lua_pop(L, 1);
 end;
@@ -678,15 +695,38 @@ end;
 
 function TLUA.CallFunction(FunctionName: AnsiString;
   const Args: array of Variant; Results: PVariantArray = nil): Integer;
+var Package, FName:string;
+    TopToBe:Integer;
+    TableIdx:Integer;
 begin
+  result := -1;
+  TopToBe:=lua_gettop(l);
   try
-    if FunctionExists(FunctionName) then
-      result := plua_callfunction(L, FunctionName, Args, Results)
-    else
-      result := -1;
-  except
-    on E:LuaException do
-      HandleException(E);
+    try
+      //function name is complex - then first push its table on stack
+      plua_FuncNameParse(FunctionName, Package, FName);
+      if Package = '' then
+        begin
+          if FunctionExists(FunctionName) then
+            result := plua_callfunction(L, FunctionName, Args, Results );
+        end
+        else
+        begin
+          if FunctionExists(Package, FName) then
+            begin
+              lua_pushstring(L, PChar(Package));
+              lua_gettable(L, LUA_GLOBALSINDEX);
+              TableIdx:=lua_gettop(l);
+
+              result := plua_callfunction(L, FName, Args, Results, TableIdx);
+            end;
+        end;
+    except
+      on E:LuaException do
+        HandleException(E);
+    end;
+  finally
+    plua_EnsureStackBalance(l, TopToBe);
   end;
 end;
 
@@ -1010,7 +1050,7 @@ begin
   List.Clear;
   if LuaType = LUA_TFUNCTION then
     begin
-      ExecuteAsFunctionStrList('return lua_info.global_functions()', List);
+      ExecuteAsFunctionStrList('return meta.GlobalFunctions()', List);
     end;
 end;
 
