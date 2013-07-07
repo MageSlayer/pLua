@@ -942,7 +942,9 @@ begin
       FOnException(title, line, msg, handled);
     end;
   if not handled then
-    raise E;
+    //To raise the same exception, we need to construct another object.
+    //Otherwise it will crash later.
+    raise LuaException.Create(E.Message);
 end;
 
 procedure TLUA.SetValue(valName : AnsiString; const AValue: Variant);
