@@ -17,6 +17,12 @@ type
   PVariantArray =^TVariantArray;
   TObjArray = array of TObject;
 
+  //Lua object type. Do not change enum values, except for addition of new types!!!
+  TLuaObjectType = ( lotFunction = 1,        //all accessible functions
+                     lotFunctionSource = 2   //all accessible functions with sources available
+                     );
+  TLuaObjectTypes = set of TLuaObjectType;
+
   LuaException = class(Exception)
   end;
 
@@ -64,6 +70,7 @@ function plua_callfunction( L: PLua_State; FunctionName : AnsiString;
 
 procedure plua_pushvariant( L : PLua_State; v : Variant);
 procedure plua_pushstrings( L : PLua_State; S : TStrings );
+procedure plua_popstrings( L : PLua_State; S : TStrings );
 
 function  plua_TableToVariantArray( L: Plua_State; Index: Integer;
                                     Keys : TStrings = nil) : variant;
@@ -299,6 +306,35 @@ begin
       lua_pushinteger(L, n+1);
       plua_pushstring(L, S.Strings[n]);
       lua_settable(L, -3);
+    end;
+end;
+
+procedure plua_popstrings(L: PLua_State; S: TStrings);
+var idx:integer;
+    Val:string;
+begin
+  S.Clear;
+  if lua_type(L,-1) = LUA_TTABLE then
+    begin
+      //read table into TString object
+
+      idx:=lua_gettop(l);
+      //table traversal
+      //http://www.lua.org/manual/5.0/manual.html#3.5
+      // table is in the stack at index idx
+      lua_pushnil(L);  // first key
+      while (lua_next(L, idx) <> 0) do
+      begin
+         if lua_type(L, -1) <> LUA_TSTRING then
+           raise LuaException.Create('ExecuteAsFunctionStrList requires to be all table values to be strings');
+
+         // key is at index -2 and value at index -1
+         Val:= plua_tostring(L, -1);
+         if Val <> '' then
+           S.Add( Val );
+
+         lua_pop(L, 1);  // removes value; keeps key for next iteration
+      end;
     end;
 end;
 
