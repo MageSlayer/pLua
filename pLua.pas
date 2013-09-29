@@ -124,6 +124,8 @@ function plua_FunctionCompile(l: PLua_State; const FuncCode:string; const Substs
 procedure lua_reporterror(l : PLua_State; const ErrMes:string);
 procedure lua_reporterror(l : PLua_State; const ErrMes:string; const Params:array of const);
 
+procedure VarToStrings(const V:variant; L:TStrings);
+
 var
   LogFunction             : procedure (const Text:string) = nil;
   DumpStackTraceFunction  : procedure = nil;
@@ -371,6 +373,22 @@ begin
     end
   else
     result := VarArrayCreate([0,0], varvariant);
+end;
+
+procedure VarToStrings(const V:variant; L:TStrings);
+var n:Integer;
+
+procedure Err;
+begin
+  raise LuaException.Create('Variant should contain array of strings');
+end;
+
+begin
+  L.Clear;
+  if VarArrayDimCount(V) <> 1 then Err;
+
+  for n:=0 to VarArrayHighBound(V, 1) do
+    L.Add(V[n]);
 end;
 
 procedure pLua_TableGlobalCreate(L: Plua_State; const TableName: string);

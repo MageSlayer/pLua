@@ -219,22 +219,6 @@ uses
 const
   Lua_Self = '__LuaWrapperSelf';
 
-procedure VarToStrings(const V:variant; L:TStrings);
-var n:Integer;
-
-procedure Err;
-begin
-  raise LuaException.Create('Variant should contain array of strings');
-end;
-
-begin
-  L.Clear;
-  if VarArrayDimCount(V) <> 1 then Err;
-
-  for n:=0 to VarArrayHighBound(V, 1) do
-    L.Add(V[n]);
-end;
-
 constructor TLUA.Create{$IFDEF TLuaAsComponent}(anOwner: TComponent){$ENDIF};
 begin
   {$IFDEF TLuaAsComponent}inherited;{$ENDIF}
