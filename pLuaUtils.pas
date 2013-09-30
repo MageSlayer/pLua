@@ -26,6 +26,7 @@ uses Forms, gstack, pLuaObject;
 const
   Package_fs = 'fs';
   Package_dbg = 'dbg';
+  Package_system = '__system';
 
 const
   AllMask = {$IFDEF WINDOWS}'*.*'{$ELSE}'*'{$ENDIF};
@@ -378,6 +379,7 @@ end;
 procedure plua_dbg_register(L: Plua_State);
 begin
   plua_RegisterMethod(l, Package_dbg, 'ProcessMessages', @plua_process_messages);
+  plua_RegisterMethod(l, Package_system, 'ProcessMessages', @plua_process_messages);
 end;
 
 { TFindFilesIterator }

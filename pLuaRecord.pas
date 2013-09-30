@@ -308,63 +308,67 @@ var
   ci   : PLuaRecordInfo;
   registered:boolean;
   S:TLuaInternalState;
+  StartTop:Integer;
 begin
-  //already registered?
-  luaL_getmetatable(l, PChar(RecordMetaTableName(RecordInfo)) );
-  registered:=lua_istable(l, -1);
-  lua_pop(l, 1);
-  if registered then
-    begin
-      plua_releaseRecordInfo(RecordInfo);
-      Exit;
-    end;
+  StartTop:=lua_gettop(l);
+  try
+    //already registered?
+    luaL_getmetatable(l, PChar(RecordMetaTableName(RecordInfo)) );
+    registered:=lua_istable(l, -1);
+    lua_pop(l, 1);
+    if registered then
+      begin
+        plua_releaseRecordInfo(RecordInfo);
+        Exit;
+      end;
 
-  S:=LuaSelf(l);
-  lidx:=S.LuaRecords.IndexOf( RecordInfo^.RecordName );
-  if lidx <> -1 then
-    begin
-      plua_releaseRecordInfo(RecordInfo);
-      Exit;
-    end;
-  lidx:=S.LuaRecords.Add(RecordInfo);
+    S:=LuaSelf(l);
+    lidx:=S.LuaRecords.IndexOf( RecordInfo^.RecordName );
+    if lidx <> -1 then
+      begin
+        plua_releaseRecordInfo(RecordInfo);
+        Exit;
+      end;
+    lidx:=S.LuaRecords.Add(RecordInfo);
 
-  plua_pushstring(l, RecordInfo^.RecordName);
-  lua_newtable(l);
+    plua_pushstring(l, RecordInfo^.RecordName);
+    lua_newtable(l);
 
-  luaL_newmetatable(l, PChar(RecordMetaTableName(RecordInfo)));
-  lua_setmetatable(l, -2);
-  lua_settable(l, LUA_GLOBALSINDEX);
+    luaL_newmetatable(l, PChar(RecordMetaTableName(RecordInfo)));
+    lua_setmetatable(l, -2);
+    lua_settable(l, LUA_GLOBALSINDEX);
 
-  luaL_getmetatable(l, PChar(RecordMetaTableName(RecordInfo)));
-  midx := lua_gettop(l);
+    luaL_getmetatable(l, PChar(RecordMetaTableName(RecordInfo)));
+    midx := lua_gettop(l);
 
-  plua_pushstring(l, RecordInfo^.RecordName);
-  lua_gettable(l, LUA_GLOBALSINDEX);
-  tidx := lua_gettop(l);
+    plua_pushstring(l, RecordInfo^.RecordName);
+    lua_gettable(l, LUA_GLOBALSINDEX);
+    tidx := lua_gettop(l);
 
-  lua_pushstring(L, '__call');
-  lua_pushcfunction(L, @plua_new_record);
-  lua_rawset(L, midx);
-  lua_pushstring(L, '__gc');
-  lua_pushcfunction(L, @plua_gc_record);
-  lua_rawset(L, midx);
+    lua_pushstring(L, '__call');
+    lua_pushcfunction(L, @plua_new_record);
+    lua_rawset(L, midx);
+    lua_pushstring(L, '__gc');
+    lua_pushcfunction(L, @plua_gc_record);
+    lua_rawset(L, midx);
 
-  lua_pushstring(L, 'new');
-  lua_pushcfunction(L, @plua_new_record);
-  lua_rawset(L, tidx);
+    lua_pushstring(L, 'new');
+    lua_pushcfunction(L, @plua_new_record);
+    lua_rawset(L, tidx);
 
-  lua_pushstring(L, '__RecordId');
-  lua_pushlightuserdata(L, RecordInfo^.RecId);
-  lua_rawset(L, tidx);
+    lua_pushstring(L, '__RecordId');
+    lua_pushlightuserdata(L, RecordInfo^.RecId);
+    lua_rawset(L, tidx);
 
-  lua_pushstring(L, '__index');
-  lua_pushcfunction(L, @plua_index_record);
-  lua_rawset(L, midx);
-  lua_pushstring(L, '__newindex');
-  lua_pushcfunction(L, @plua_newindex_record);
-  lua_rawset(L, midx);
-
-  lua_pop(L, -2);
+    lua_pushstring(L, '__index');
+    lua_pushcfunction(L, @plua_index_record);
+    lua_rawset(L, midx);
+    lua_pushstring(L, '__newindex');
+    lua_pushcfunction(L, @plua_newindex_record);
+    lua_rawset(L, midx);
+  finally
+    plua_EnsureStackBalance(l, StartTop);
+  end;
 end;
 
 procedure plua_newRecordInfo(var RecordInfoPointer: PLuaRecordInfo);
