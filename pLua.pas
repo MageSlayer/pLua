@@ -787,7 +787,6 @@ begin
     plua_pushstring(L, aMethodName);
     lua_pushlightuserdata(l, Pointer(Func));
     lua_pushcclosure(L, @plua_call_method, 1);
-    lua_logstack('plua_RegisterMethod', l);
     lua_rawset(l, -3);
   finally
     plua_EnsureStackBalance(L, StartTop);
