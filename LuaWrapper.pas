@@ -1027,29 +1027,43 @@ begin
 end;
 
 procedure TLUA.GlobalObjectNames(List: TStrings; LuaTypes: TLuaObjectTypes);
-var ObjL:TStringList;
+const
+  LuaFunc = 'meta.GlobalObjects';
+
+var ObjL, ResList:TStringList;
     Res:TVariantArray;
 begin
   ObjL:=TStringList.Create;
+  ResList:=TStringList.Create;
+  ResList.Duplicates:=dupIgnore;
   try
-    List.Clear;
     if lotFunction in LuaTypes then
       begin
-        //ExecuteAsFunctionStrList('return meta.GlobalFunctions()', L);
-        CallFunction('meta.GlobalFunctions', [0], @Res);
+        CallFunction(LuaFunc, [Integer(lotFunction)], @Res);
         VarToStrings(Res[0], ObjL);
-        List.AddStrings(ObjL);
+        ResList.AddStrings(ObjL);
       end;
 
     if lotFunctionSource in LuaTypes then
       begin
-        //ExecuteAsFunctionStrList('return meta.GlobalFunctions()', L);
-        CallFunction('meta.GlobalFunctions', [1], @Res);
+        CallFunction(LuaFunc, [Integer(lotFunctionSource)], @Res);
         VarToStrings(Res[0], ObjL);
-        List.AddStrings(ObjL);
+        ResList.AddStrings(ObjL);
       end;
+
+    if lotGlobalVars in LuaTypes then
+      begin
+        CallFunction(LuaFunc, [Integer(lotGlobalVars)], @Res);
+        VarToStrings(Res[0], ObjL);
+        ResList.AddStrings(ObjL);
+      end;
+
+    ResList.Sort;
+    List.Clear;
+    List.AddStrings(ResList);
   finally
     ObjL.Free;
+    ResList.Free;
   end;
 end;
 

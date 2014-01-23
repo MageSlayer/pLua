@@ -19,7 +19,8 @@ type
 
   //Lua object type. Do not change enum values, except for addition of new types!!!
   TLuaObjectType = ( lotFunction = 1,        //all accessible functions
-                     lotFunctionSource = 2   //all accessible functions with sources available
+                     lotFunctionSource = 2,  //all accessible functions with sources available
+                     lotGlobalVars = 3       //all global vars
                      );
   TLuaObjectTypes = set of TLuaObjectType;
 
