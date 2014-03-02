@@ -54,6 +54,7 @@ type
     function  GetLuaCPath: AnsiString;
     function  GetLuaPath: AnsiString;
     function  GetValue(valName : AnsiString): Variant;
+    procedure LoadScriptStr(const Script: string);
     procedure PushErrorHandler;
     procedure SetLibName(const Value: AnsiString);
     procedure SetLuaCPath(const AValue: AnsiString);
@@ -65,7 +66,7 @@ type
     procedure ErrorTest(errCode : Integer);
     procedure HandleException(E : LuaException);
     procedure SetValue(valName : AnsiString; const AValue: Variant);
-    procedure ExecuteScript(NResults:integer);
+    procedure ExecuteScript(NArgs, NResults:integer);
   public
     constructor Create{$IFDEF TLuaAsComponent}(anOwner : TComponent); override;{$ENDIF}
     {$IFDEF TLuaAsComponent}constructor Create;{$ENDIF}
@@ -92,12 +93,17 @@ type
     //It's purpose is to run it multiple times without reloading.
     procedure LoadFunctionFromFile(const FileName:string; const FunctionSaveAs:string);
     procedure LoadFunctionFromScript(const Script:string; const FunctionSaveAs:string);
+    //Loads all functions with names FuncNames and bodies from FuncDumps
+    procedure LoadFunctionFromStrings(FuncNames:TStrings; FuncDumps:TStrings);
 
     procedure Execute;
 
     function  ExecuteAsFunctionObj(const FunctionName:string):TObject;
     function  ExecuteAsFunctionObjList(const FunctionName:string):TObjArray;
-    procedure ExecuteAsFunctionStrList(const Script: string; ResultTable: TStrings);
+    procedure ExecuteAsFunctionStrList(const Script: string; ResultTable: TStrings; KeyTable:TStrings = nil);
+
+    procedure ExecuteAsFunction(const Script: string; const args:array of Variant; Results : PVariantArray = nil;
+                                VariantHandler:TLuaVariantHandler = nil; CdataHandler:TLuaCdataHandler = nil);
 
     procedure ExecuteCmd(Script:AnsiString);
     procedure ExecuteAsRepl(const Script:String; out ReplResult:string);
@@ -114,8 +120,12 @@ type
     function  FunctionExists(const aMethodName:AnsiString; TableIdx:Integer = LUA_GLOBALSINDEX) : Boolean;
     function  FunctionExists(const Package, aMethodName: AnsiString): Boolean;
 
-    function  CallFunction( FunctionName :AnsiString; const Args: array of Variant;
-                            Results : PVariantArray = nil):Integer;
+    function  CallFunction( FunctionName :AnsiString;
+                            const Args: array of Variant; //necessary to be able to call using [...] (array of const)
+                            Results : PVariantArray = nil;
+                            VariantHandler:TLuaVariantHandler = nil;
+                            CdataHandler:TLuaCdataHandler = nil):Integer;overload;
+
     function  TableExists(const TableName:string):boolean;
     function  TableFunctionExists(TableName, FunctionName : AnsiString; out tblidx : Integer) : Boolean; overload;
     function  TableFunctionExists(TableName, FunctionName : AnsiString) : Boolean; overload;
@@ -271,7 +281,10 @@ begin
             end;
 
           plua_ref_release( l, nfo );
-          LuaObjects_Free( TLuaInternalState(Self), nfo );
+          try
+            LuaObjects_Free( TLuaInternalState(Self), nfo );
+          except
+          end;
         end;
       dec(i);
     end;
@@ -310,7 +323,7 @@ begin
   inherited;
 end;
 
-procedure TLUA.ExecuteScript(NResults: integer);
+procedure TLUA.ExecuteScript(NArgs, NResults: integer);
 var errCode:Integer;
     msg:string;
 begin
@@ -322,11 +335,11 @@ begin
       raise Exception.Create('No error handler installed');
 
     if (lua_gettop(l) <= 0) or
-       (lua_type(L,-1) <> LUA_TFUNCTION) then
+       (lua_type(L, lua_gettop(l) - Nargs) <> LUA_TFUNCTION) then
       raise Exception.Create('No script is loaded at stack');
 
     //ErrorTest(lua_pcall(L, 0, NResults, 0));
-    errCode:=lua_pcall(L, 0, NResults, FErrHandler);
+    errCode:=lua_pcall(L, NArgs, NResults, FErrHandler);
     if errCode <> 0 then
       begin
         msg := plua_tostring(l, -1);
@@ -339,7 +352,7 @@ end;
 
 procedure TLUA.Execute;
 begin
-  ExecuteScript(0);
+  ExecuteScript(0,0);
 end;
 
 function TLUA.ExecuteAsFunctionObj(const FunctionName:string): TObject;
@@ -355,7 +368,7 @@ begin
     //load function with name FunctionName on stack
     lua_getglobal(l, PChar(FunctionName));
 
-    ExecuteScript(LUA_MULTRET);
+    ExecuteScript(0,LUA_MULTRET);
     tix:=lua_gettop(l);
     if tix > 0 then
       begin
@@ -383,7 +396,7 @@ begin
     //load function with name FunctionName on stack
     lua_getglobal(l, PChar(FunctionName));
 
-    ExecuteScript(LUA_MULTRET);
+    ExecuteScript(0,LUA_MULTRET);
     tix:=lua_gettop(l);
     if tix > 0 then
       begin
@@ -409,7 +422,14 @@ begin
   end;
 end;
 
-procedure TLUA.ExecuteAsFunctionStrList(const Script: string; ResultTable:TStrings) ;
+procedure TLUA.LoadScriptStr(const Script:string);
+//loads string on Lua stack
+begin
+  //Can't use luaL_loadstring here, as Script can contain zeroes in bytecode strings
+  ErrorTest( luaL_loadbuffer(l, PChar(Script), Length(Script), 'dyn_str_script') );
+end;
+
+procedure TLUA.ExecuteAsFunctionStrList(const Script: string; ResultTable:TStrings; KeyTable:TStrings) ;
 var StartTop:integer;
 begin
   ResultTable.Create;
@@ -418,9 +438,31 @@ begin
   try
     PushErrorHandler;
 
-    luaL_loadstring(l, PChar(Script));
-    ExecuteScript(LUA_MULTRET);
-    plua_popstrings(l, ResultTable);
+    LoadScriptStr(Script);
+    ExecuteScript(0,LUA_MULTRET);
+    plua_popstrings(l, ResultTable, KeyTable);
+  finally
+    plua_EnsureStackBalance(l, StartTop);
+  end;
+end;
+
+procedure TLUA.ExecuteAsFunction(const Script: string; const args: array of Variant; Results: PVariantArray;
+  VariantHandler:TLuaVariantHandler; CdataHandler:TLuaCdataHandler);
+var StartTop, result_count, TopBeforeExecute:integer;
+begin
+  StartTop:=lua_gettop(l);
+  try
+    PushErrorHandler;
+    TopBeforeExecute:=lua_gettop(l); //have to be called immediately before luaL_loadstring
+
+    LoadScriptStr(Script);
+    plua_pushvariants(l, args, VariantHandler);
+    ExecuteScript(Length(args), LUA_MULTRET);
+    if Results <> nil then
+      begin
+        result_count:=lua_gettop(l) - TopBeforeExecute;
+        Results^:=plua_popvariants(l, result_count, CdataHandler);
+      end;
   finally
     plua_EnsureStackBalance(l, StartTop);
   end;
@@ -437,7 +479,7 @@ begin
     PushErrorHandler;
 
     ErrorTest(luaL_loadbuffer(L, PChar(Script), Length(Script), PChar(LibName)));
-    ExecuteScript(0);
+    ExecuteScript(0,0);
   finally
     plua_EnsureStackBalance(l, StartTop);
   end;
@@ -459,7 +501,7 @@ begin
       PushErrorHandler;
 
       ErrorTest(luaL_loadbuffer(L, PChar(Script), Length(Script), PChar(LibName)));
-      ExecuteScript(LUA_MULTRET); // LUA_MULTRET - нас интересуют _все_ результаты
+      ExecuteScript(0,LUA_MULTRET); // LUA_MULTRET - нас интересуют _все_ результаты
     except
       on E:Exception do
         begin
@@ -496,7 +538,7 @@ begin
   try
     PushErrorHandler;
     ErrorTest(luaL_loadfile(L, PChar(FileName)));
-    ExecuteScript(0);
+    ExecuteScript(0,0);
   finally
     plua_EnsureStackBalance(l, StartTop);
   end;
@@ -549,6 +591,21 @@ begin
   plua_CheckStackBalance(l, StartTop);
 end;
 
+procedure TLUA.LoadFunctionFromStrings(FuncNames: TStrings; FuncDumps: TStrings);
+var i:Integer;
+    StartTop:integer;
+begin
+  StartTop:=lua_gettop(l);
+
+  for i:=0 to FuncNames.Count-1 do
+    begin
+      LoadScriptStr(FuncDumps.Strings[i]);
+      lua_setglobal(L, PChar(FuncNames.Strings[i]));
+    end;
+
+  plua_CheckStackBalance(l, StartTop);
+end;
+
 procedure TLUA.LoadScript(const Script: AnsiString);
 var StartTop:integer;
 begin
@@ -561,11 +618,12 @@ begin
   StartTop:=lua_gettop(l);
 
   FScript := Trim(Script);
-  FLibFile := '';
-  if FScript <> '' then
-    luaL_loadbuffer(L, PChar(Script), length(Script), PChar(LibName));
+  if FScript = '' then Exit;
 
-  plua_CheckStackBalance(l, StartTop);
+  FLibFile := '';
+  luaL_loadbuffer(L, PChar(Script), length(Script), PChar(LibName));
+
+  plua_CheckStackBalance(l, StartTop + 1);
 end;
 
 function TLUA.FunctionExists(const Package, aMethodName: AnsiString): Boolean;
@@ -590,7 +648,7 @@ begin
   lua_pop(L, 1);
 end;
 
-procedure TLUA.RegisterLUAMethod(const aMethodName: AnsiString; Func: lua_CFunction);
+procedure TLUA.RegisterLuaMethod(const aMethodName: AnsiString; Func: lua_CFunction);
 begin
   if L = nil then
     Open;
@@ -673,7 +731,8 @@ begin
 end;
 
 function TLUA.CallFunction(FunctionName: AnsiString;
-  const Args: array of Variant; Results: PVariantArray = nil): Integer;
+  const Args: array of Variant; Results: PVariantArray = nil;
+  VariantHandler:TLuaVariantHandler = nil; CdataHandler:TLuaCdataHandler = nil): Integer;
 var Package, FName:string;
     TopToBe:Integer;
     TableIdx:Integer;
@@ -682,12 +741,15 @@ begin
   TopToBe:=lua_gettop(l);
   try
     try
+      //get a stack trace in case of error
+      PushErrorHandler;
+
       //function name is complex - then first push its table on stack
       plua_FuncNameParse(FunctionName, Package, FName);
       if Package = '' then
         begin
           if FunctionExists(FunctionName) then
-            result := plua_callfunction(L, FunctionName, Args, Results );
+            result := plua_callfunction(L, FunctionName, Args, Results, LUA_GLOBALSINDEX, FErrHandler, nil, VariantHandler, CdataHandler );
         end
         else
         begin
@@ -697,7 +759,7 @@ begin
               lua_gettable(L, LUA_GLOBALSINDEX);
               TableIdx:=lua_gettop(l);
 
-              result := plua_callfunction(L, FName, Args, Results, TableIdx);
+              result := plua_callfunction(L, FName, Args, Results, TableIdx, FErrHandler, nil, VariantHandler, CdataHandler);
             end;
         end;
     except
@@ -705,6 +767,7 @@ begin
         HandleException(E);
     end;
   finally
+    //error handler should be cleared here as well
     plua_EnsureStackBalance(l, TopToBe);
   end;
 end;
