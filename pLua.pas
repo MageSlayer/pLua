@@ -31,6 +31,10 @@ type
   TLuaProc = function (l : PLua_State; paramcount: Integer) : integer;
   TLuaNakedProc = function (l : PLua_State) : integer;
 
+  TLuaCdataHandler = function (Cdata:Pointer):Variant;
+  TLuaVariantHandler = function (l : Plua_State; const V:Variant) : boolean;
+  TLuaVariantFinalizer = procedure (var V:Variant);
+
 {$IFDEF LUA_LPEG} // as it links statically, not everybody can need it.
 const
   {$IFDEF WINDOWS}
@@ -50,7 +54,7 @@ function luaopen_lpeg (L: PLua_State):Integer;cdecl;external LpegLib;
 {$ENDIF}
 
 function  plua_tostring(L: PLua_State; Index: Integer): ansistring;
-procedure plua_pushstring(L: PLua_State; AString : AnsiString);
+procedure plua_pushstring(L: PLua_State; const AString : AnsiString);
 function StrToPChar(const S:string):PChar;
 
 procedure plua_RegisterLuaTable( l:PLua_State; Name : AnsiString;
@@ -64,14 +68,23 @@ function plua_functionexists( L: PLua_State; FunctionName : AnsiString;
 type
   TLuaParamPushProc = function (L:Plua_State):Integer is nested;
 function plua_callfunction( L: PLua_State; FunctionName : AnsiString;
-                            const args : Array of Variant;
+                            const args : array of Variant;
                             results : PVariantArray = nil;
                             TableIndex : Integer = LUA_GLOBALSINDEX;
-                            ParamsToPush:TLuaParamPushProc = nil) : Integer;
+                            ErrHandler: Integer = 0;
+                            ParamsToPush:TLuaParamPushProc = nil;
+                            VariantHandler:TLuaVariantHandler = nil;
+                            CdataHandler:TLuaCdataHandler = nil) : Integer;
 
-procedure plua_pushvariant( L : PLua_State; v : Variant);
+procedure plua_pushvariant( L : PLua_State; const v : Variant; VariantHandler:TLuaVariantHandler = nil);
+procedure plua_pushvariants( L : PLua_State; const v : array of Variant; VariantHandler:TLuaVariantHandler = nil);
+function  plua_popvariant( L : PLua_State; CdataHandler:TLuaCdataHandler = nil ):Variant;
 procedure plua_pushstrings( L : PLua_State; S : TStrings );
-procedure plua_popstrings( L : PLua_State; S : TStrings );
+procedure plua_popstrings( L : PLua_State; S : TStrings; Keys:TStrings = nil );
+function  plua_popvariants( L : PLua_State; count:integer; CdataHandler:TLuaCdataHandler = nil ):TVariantArray;
+
+//dumps function on top of stack to string (string.dump analog)
+function plua_popFuncDump( L : PLua_State ):string;
 
 function  plua_TableToVariantArray( L: Plua_State; Index: Integer;
                                     Keys : TStrings = nil) : variant;
@@ -79,7 +92,7 @@ function  plua_TableToVariantArray( L: Plua_State; Index: Integer;
 procedure pLua_TableGlobalCreate(L : Plua_State; const TableName:string);
 function pLua_TableExists(L : Plua_State; const TableName:string):boolean;
 
-function plua_tovariant(L: Plua_State; Index: Integer): Variant;
+function plua_tovariant(L: Plua_State; Index: Integer; CdataHandler:TLuaCdataHandler = nil): Variant;
 
 function plua_absindex(L: Plua_State; Index: Integer): integer;
 
@@ -180,9 +193,11 @@ begin
     Move(S^, Pchar(@Result[1])^, Size);
 end;
 
-procedure plua_pushstring(L: PLua_State; AString: AnsiString);
+procedure plua_pushstring(L: PLua_State; const AString: AnsiString);
 begin
-  lua_pushstring(l, pchar(AString));
+  //do not use lua_pushstring
+  //as it does not deal properly with Pascal strings containing zeroes
+  lua_pushlstring(l, PChar(AString), Length(AString));
 end;
 
 function StrToPChar(const S:string):PChar;
@@ -233,10 +248,13 @@ begin
 end;
 
 function plua_callfunction( L: PLua_State; FunctionName : AnsiString;
-                            const args : Array of Variant;
+                            const args : array of Variant;
                             results : PVariantArray;
                             TableIndex : Integer;
-                            ParamsToPush:TLuaParamPushProc) : Integer;
+                            ErrHandler : Integer;
+                            ParamsToPush:TLuaParamPushProc;
+                            VariantHandler:TLuaVariantHandler;
+                            CdataHandler:TLuaCdataHandler) : Integer;
 var
    NArgs, offset,
    i :Integer;
@@ -254,11 +272,10 @@ begin
     end
     else
     begin
+      plua_pushvariants(l, args, VariantHandler);
       NArgs := High(Args);
-      for i:=0 to NArgs do
-        plua_pushvariant(l, args[i]);
     end;
-  if lua_pcall(l, NArgs+1, LUA_MULTRET, 0) <> 0 then
+  if lua_pcall(l, NArgs+1, LUA_MULTRET, ErrHandler) <> 0 then
     begin
       msg := plua_tostring(l, -1);
       lua_pop(l, 1);
@@ -267,37 +284,53 @@ begin
   result := lua_gettop(l) - offset;
   if (Results<>Nil) then
     begin
-      SetLength(Results^, Result);
-      for i:=0 to Result-1 do
-        Results^[Result-i-1] := plua_tovariant(L, -(i+1));
+      Results^:=plua_popvariants(l, result, CdataHandler);
     end;
 end;
 
-procedure plua_pushvariant(L: PLua_State; v: Variant);
+procedure plua_pushvariant(L: PLua_State; const v: Variant; VariantHandler:TLuaVariantHandler);
 var
   h, c : Integer;
 begin
-  case VarType(v) of
-    varEmpty,
-    varNull    : lua_pushnil(L);
-    varBoolean : lua_pushboolean(L, v);
-    varStrArg,
-    varOleStr,
-    varString  : plua_pushstring(L, v);
-    varDate    : plua_pushstring(L, DateTimeToStr(VarToDateTime(v)));
-    varArray   : begin
-                   h := VarArrayHighBound(v, 1);
-                   lua_newtable(L);
-                   for c := 0 to h do
-                     begin
-                       lua_pushinteger(L, c+1);
-                       plua_pushvariant(L, v[c]);
-                       lua_settable(L, -3);
-                     end;
-                 end;
-  else
-    lua_pushnumber(L, Double(VarAsType(v, varDouble)));
-  end;
+  if (VariantHandler = nil) or    //if variant handler is not defined
+     (not VariantHandler(l, v))   //or it could not push the value on stack
+    then                          //then fallback to standard push implementation
+    case VarType(v) of
+      varEmpty,
+      varNull    : lua_pushnil(L);
+      varBoolean : lua_pushboolean(L, v);
+      varStrArg,
+      varOleStr,
+      varString  : plua_pushstring(L, v);
+      varDate    : plua_pushstring(L, DateTimeToStr(VarToDateTime(v)));
+      varArray   : begin
+                     h := VarArrayHighBound(v, 1);
+                     lua_newtable(L);
+                     for c := 0 to h do
+                       begin
+                         lua_pushinteger(L, c+1);
+                         plua_pushvariant(L, v[c]);
+                         lua_settable(L, -3);
+                       end;
+                   end;
+    else
+      lua_pushnumber(L, Double(VarAsType(v, varDouble)));
+    end;
+end;
+
+procedure plua_pushvariants(L: PLua_State; const v: array of Variant; VariantHandler:TLuaVariantHandler);
+var i:Integer;
+begin
+  for i:=0 to High(v) do
+    plua_pushvariant(l, v[i], VariantHandler);
+end;
+
+function plua_popvariant(L: PLua_State; CdataHandler:TLuaCdataHandler): Variant;
+begin
+  Result:=plua_tovariant(l, -1, CdataHandler);
+
+  //remove value from stack
+  lua_pop(l, 1);
 end;
 
 procedure plua_pushstrings(L: PLua_State; S: TStrings);
@@ -312,10 +345,13 @@ begin
     end;
 end;
 
-procedure plua_popstrings(L: PLua_State; S: TStrings);
+procedure plua_popstrings(L: PLua_State; S: TStrings; Keys: TStrings);
 var idx:integer;
     Val:string;
 begin
+  if Keys <> nil then
+    Keys.Clear;
+
   S.Clear;
   if lua_type(L,-1) = LUA_TTABLE then
     begin
@@ -334,11 +370,68 @@ begin
          // key is at index -2 and value at index -1
          Val:= plua_tostring(L, -1);
          if Val <> '' then
-           S.Add( Val );
+           begin
+             S.Add( Val );
+             if Keys <> nil then
+               Keys.Add( plua_tostring(L, -2) );
+           end;
 
          lua_pop(L, 1);  // removes value; keeps key for next iteration
       end;
     end;
+end;
+
+function plua_popvariants(L: PLua_State; count: integer; CdataHandler:TLuaCdataHandler): TVariantArray;
+//pops 'count' elements from stack into TVariantArray
+//reverses element order
+//supports count = 0
+var i:Integer;
+begin
+  SetLength(Result, count);
+  for i:=0 to count-1 do
+    begin
+      Result[count - 1 - i]:=plua_popvariant(L, CdataHandler);
+    end;
+end;
+
+function plua_popFuncDump(L: PLua_State): string;
+//dumps function internal representation to string
+//string.dump analog
+var StackTop:Integer;
+    nargs:integer;
+begin
+  StackTop:=lua_gettop(l);
+  try
+    if lua_type(l, -1) <> LUA_TFUNCTION then
+      raise LuaException.Create('plua_popFuncDump requires function on stack top');
+
+    lua_getglobal(l, 'string');
+    lua_getfield(l, -1, 'dump');
+
+    if lua_isnil(l, -1) then
+      raise LuaException.Create('plua_popFuncDump string.dump not found');
+
+    //remove 'string' global table
+    lua_remove(l, lua_gettop(l) - 1);
+
+    //move string.dump function before function on stack
+    lua_insert(l, lua_gettop(l) - 1);
+
+    nargs:=1;
+    {$IFDEF LUAJIT}
+    //LuaJIT has an additional parameter to drop debug information
+    lua_pushboolean(l, true);
+    Inc(nargs);
+    {$ENDIF}
+
+    if lua_pcall(l, nargs, 1, 0) <> 0 then
+      raise LuaException.Create('plua_popFuncDump string.dump error');
+
+    Result:=plua_tostring(l, -1);
+    lua_pop(l, 1);
+  finally
+    plua_EnsureStackBalance(l, StackTop);
+  end;
 end;
 
 function  plua_TableToVariantArray( L: Plua_State; Index: Integer;
@@ -412,7 +505,7 @@ begin
   end;
 end;
 
-function plua_tovariant(L: Plua_State; Index: Integer): Variant;
+function plua_tovariant(L: Plua_State; Index: Integer; CdataHandler:TLuaCdataHandler): Variant;
 Var
   dataType :Integer;
   dataNum  :Double;
@@ -438,6 +531,14 @@ begin
                                end;
                            end;
     LUA_TTABLE           : result := plua_TableToVariantArray(L, Index);
+
+    {$IFDEF LUAJIT}
+    LUA_TCDATA:
+      if CdataHandler = nil then
+         raise LuaException.Create('Cannot pop cdata from stack. plua_tovariant')
+         else
+         Result:=CdataHandler( lua_topointer(L, Index) );
+    {$ENDIF}
   else
     result := NULL;
   end;
