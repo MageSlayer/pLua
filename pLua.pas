@@ -86,12 +86,15 @@ function  plua_popvariants( L : PLua_State; count:integer; CdataHandler:TLuaCdat
 //dumps function on top of stack to string (string.dump analog)
 function plua_popFuncDump( L : PLua_State ):string;
 
+//deprecated. Do not use. Use plua_TableToVariant instead
 function  plua_TableToVariantArray( L: Plua_State; Index: Integer;
                                     Keys : TStrings = nil) : variant;
 
 procedure pLua_TableGlobalCreate(L : Plua_State; const TableName:string);
 function pLua_TableExists(L : Plua_State; const TableName:string):boolean;
 
+procedure plua_PushTable(L: PLua_State; const v:variant; VariantHandler:TLuaVariantHandler = nil);
+function plua_TableToVariant( L: Plua_State; Index: Integer; CdataHandler:TLuaCdataHandler = nil ) : variant;
 function plua_tovariant(L: Plua_State; Index: Integer; CdataHandler:TLuaCdataHandler = nil): Variant;
 
 function plua_absindex(L: Plua_State; Index: Integer): integer;
@@ -138,7 +141,7 @@ function plua_FunctionCompile(l: PLua_State; const FuncCode:string; const Substs
 procedure lua_reporterror(l : PLua_State; const ErrMes:string);
 procedure lua_reporterror(l : PLua_State; const ErrMes:string; const Params:array of const);
 
-procedure VarToStrings(const V:variant; L:TStrings);
+procedure VarToStrings(const V:variant; Values:TStrings; Keys:TStrings = nil);
 
 var
   LogFunction             : procedure (const Text:string) = nil;
@@ -288,9 +291,31 @@ begin
     end;
 end;
 
-procedure plua_pushvariant(L: PLua_State; const v: Variant; VariantHandler:TLuaVariantHandler);
+procedure plua_PushTable(L: PLua_State; const v:variant; VariantHandler:TLuaVariantHandler);
 var
-  h, c : Integer;
+  i, h: Integer;
+  keys, values : array of variant;
+begin
+  // lua table to be pushed contains of two elements (see plua_TableToVariant)
+  h := VarArrayHighBound(v, 1);
+  assert( h = 1, 'Invalid array passed to plua_pushvariant' );
+  // first containts a variant array of values
+  values:=v[0];
+  // second containts a variant array of keys
+  keys:=v[1];
+  assert( Length(keys) = Length(values), 'Keys/values passed to plua_pushvariant do not match' );
+
+  lua_newtable(L);
+  for i := 0 to High(keys) do
+    begin
+      plua_pushvariant(L, keys[i], VariantHandler);
+      plua_pushvariant(L, values[i], VariantHandler);
+      lua_settable(L, -3);
+    end;
+end;
+
+procedure plua_pushvariant(L: PLua_State; const v: Variant; VariantHandler:TLuaVariantHandler);
+var c, h:Integer;
 begin
   if (VariantHandler = nil) or    //if variant handler is not defined
      (not VariantHandler(l, v))   //or it could not push the value on stack
@@ -298,11 +323,23 @@ begin
     case VarType(v) of
       varEmpty,
       varNull    : lua_pushnil(L);
+
       varBoolean : lua_pushboolean(L, v);
+
       varStrArg,
       varOleStr,
       varString  : plua_pushstring(L, v);
+
       varDate    : plua_pushstring(L, DateTimeToStr(VarToDateTime(v)));
+
+      varsmallint,
+      varinteger,
+      varsingle,
+      varint64,
+      vardecimal,
+      vardouble  :
+                   lua_pushnumber(L, Double(VarAsType(v, varDouble)));
+
       varArray   : begin
                      h := VarArrayHighBound(v, 1);
                      lua_newtable(L);
@@ -313,8 +350,13 @@ begin
                          lua_settable(L, -3);
                        end;
                    end;
-    else
-      lua_pushnumber(L, Double(VarAsType(v, varDouble)));
+
+      vararray + varvariant: //array of variant
+                   begin
+                     plua_pushtable(l, v, VariantHandler);
+                   end;
+      else
+        raise LuaException.CreateFmt('Unsupported type (%d) passed to plua_pushvariant', [VarType(v)]);
     end;
 end;
 
@@ -469,20 +511,30 @@ begin
     result := VarArrayCreate([0,0], varvariant);
 end;
 
-procedure VarToStrings(const V:variant; L:TStrings);
-var n:Integer;
-
-procedure Err;
+procedure VarToStrings(const V:variant; Values:TStrings; Keys:TStrings);
+var vkeys, vvalues : Variant;
+    h, n:Integer;
 begin
-  raise LuaException.Create('Variant should contain array of strings');
-end;
+  Values.Clear;
+  if Keys <> nil then
+    Keys.Clear;
 
-begin
-  L.Clear;
-  if VarArrayDimCount(V) <> 1 then Err;
+  //see plua_TableToVariant for details
+  if VarArrayDimCount(V) <> 1 then
+    raise LuaException.Create('Invalid array passed to VarToStrings');
 
-  for n:=0 to VarArrayHighBound(V, 1) do
-    L.Add(V[n]);
+  h:=VarArrayHighBound(V, 1);
+  if h <> 1 then
+    raise LuaException.Create('Invalid array passed to VarToStrings');
+
+  vvalues:=V[0];
+  vkeys:=V[1];
+  for n:=0 to h do
+    begin
+      Values.Add( vvalues[n] );
+      if Keys <> nil then
+        Keys.Add( vkeys[n] );
+    end;
 end;
 
 procedure pLua_TableGlobalCreate(L: Plua_State; const TableName: string);
@@ -503,6 +555,55 @@ begin
   finally
     plua_EnsureStackBalance(L, StartTop);
   end;
+end;
+
+function  plua_TableToVariant( L: Plua_State; Index: Integer; CdataHandler:TLuaCdataHandler ) : variant;
+// gets Lua table recursively
+// table are returned variant of two elements.
+// values in first subarray and keys in second subarray
+
+function VariantArrayToVarArray(const A:array of variant; realcount:Integer):Variant;
+var i:Integer;
+begin
+  result := VarArrayCreate([0,realcount-1], varvariant);
+  for i:=0 to realcount-1 do
+    begin
+      result[i] := A[i];
+    end;
+end;
+
+var
+  i , realcount: Integer;
+  keys, values : array of Variant;
+begin
+  Index := plua_absindex(L, Index);
+
+  realcount:=0;
+  SetLength(keys, 10);
+  SetLength(values, 10);
+
+  lua_pushnil(L);
+  i := 0;
+  while (lua_next(L, Index) <> 0) do
+    begin
+      Inc(realcount);
+      if realcount > Length(keys) then
+        begin
+          SetLength(keys, realcount + 10);
+          SetLength(values, realcount + 10);
+        end;
+
+      keys[i]  :=plua_tovariant(L, -2, CdataHandler);
+      values[i]:=plua_tovariant(L, -1, CdataHandler);   // recursive call is here (tables inside tables)
+
+      lua_pop(L, 1);
+      inc(i);
+    end;
+
+  //pack Lua table into two-element variant array
+  result := VarArrayCreate([0,1], varvariant);
+  result[0] := VariantArrayToVarArray(values, realcount);
+  result[1] := VariantArrayToVarArray(keys, realcount);
 end;
 
 function plua_tovariant(L: Plua_State; Index: Integer; CdataHandler:TLuaCdataHandler): Variant;
@@ -530,7 +631,8 @@ begin
                                    Result :=VarAsType(Trunc(dataNum), varDouble);
                                end;
                            end;
-    LUA_TTABLE           : result := plua_TableToVariantArray(L, Index);
+    //LUA_TTABLE           : result := plua_TableToVariantArray(L, Index);
+    LUA_TTABLE           : result := plua_TableToVariant(L, Index, CdataHandler);
 
     {$IFDEF LUAJIT}
     LUA_TCDATA:
