@@ -529,6 +529,7 @@ begin
 
   vvalues:=V[0];
   vkeys:=V[1];
+  h:=VarArrayHighBound(vvalues, 1);
   for n:=0 to h do
     begin
       Values.Add( vvalues[n] );
