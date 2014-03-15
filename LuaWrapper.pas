@@ -13,7 +13,7 @@ interface
 {$DEFINE TLuaHandlersAsIsObjectType}
 
 uses
-  Classes,
+  Classes, SysUtils,
   lua,
   pLua,
   pLuaObject, pLuaRecord;
@@ -51,6 +51,7 @@ type
 
     procedure ClearObjects(LeakWarnings: boolean);
     procedure ClearRecords;
+    function ExceptionBackTrace: string;
     function  GetLuaCPath: AnsiString;
     function  GetLuaPath: AnsiString;
     function  GetValue(valName : AnsiString): Variant;
@@ -64,7 +65,7 @@ type
     procedure SetOnLoadLibs(const AValue: TLuaOnLoadLibs);
     procedure SetUseDebug(const AValue: Boolean);
     procedure ErrorTest(errCode : Integer);
-    procedure HandleException(E : LuaException);
+    procedure HandleException(E : Exception);
     procedure SetValue(valName : AnsiString; const AValue: Variant);
     procedure ExecuteScript(NArgs, NResults:integer);
   public
@@ -223,8 +224,7 @@ implementation
 
 uses
   //Classes,
-  Variants,
-  SysUtils;
+  Variants;
 
 const
   Lua_Self = '__LuaWrapperSelf';
@@ -485,6 +485,22 @@ begin
   end;
 end;
 
+function TLUA.ExceptionBackTrace:string;
+var
+  FrameNumber,
+  FrameCount   : longint;
+  Frames       : PPointer;
+begin
+  Result:='';
+  if RaiseList=nil then
+    exit;
+  Result:=BackTraceStrFunc(RaiseList^.Addr);
+  FrameCount:=RaiseList^.Framecount;
+  Frames:=RaiseList^.Frames;
+  for FrameNumber := 0 to FrameCount-1 do
+    Result:=Result + sLineBreak + BackTraceStrFunc(Frames[FrameNumber]);
+end;
+
 procedure TLUA.ExecuteAsRepl(const Script: String; out ReplResult: string);
 var StartTop:Integer;
     r:String;
@@ -505,7 +521,7 @@ begin
     except
       on E:Exception do
         begin
-          ReplResult:=E.Message + sLineBreak;
+          ReplResult:=E.Message + sLineBreak + ExceptionBackTrace;
           ExceptThrown:=true;
         end;
     end;
@@ -763,7 +779,7 @@ begin
             end;
         end;
     except
-      on E:LuaException do
+      on E:Exception do
         HandleException(E);
     end;
   finally
@@ -971,7 +987,7 @@ begin
     end;
 end;
 
-procedure TLUA.HandleException(E: LuaException);
+procedure TLUA.HandleException(E: Exception);
 var
   title, msg : AnsiString;
   line       : Integer;
@@ -986,7 +1002,7 @@ begin
   if not handled then
     //To raise the same exception, we need to construct another object.
     //Otherwise it will crash later.
-    raise LuaException.Create(E.Message);
+    raise LuaException.Create(E.Message + sLineBreak + ExceptionBackTrace);
 end;
 
 procedure TLUA.SetValue(valName : AnsiString; const AValue: Variant);
