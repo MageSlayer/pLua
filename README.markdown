@@ -9,7 +9,7 @@ A fork of a project called pLua previously hosted at <http://www.eonclash.com> (
 Description
 -----------
 
-The project aims at embedding Lua/LuaJit interpreter into FreePascal/Lazarus based projects.
+The project aims at embedding Lua/LuaJIT interpreter into FreePascal/Lazarus based projects.
 
 Original pLua project's sources are located in master branch.
 
@@ -32,7 +32,7 @@ Known issues
 
 License
 -------
-LGPLv3+
+MIT (the same as Lua)
 
 TODO
 ----
