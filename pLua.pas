@@ -618,7 +618,7 @@ begin
     LUA_TUSERDATA,
     LUA_TLIGHTUSERDATA   : Result := VarAsType(PtrInt(lua_touserdata(L, Index)), varInteger);
     LUA_TNONE,
-    LUA_TNIL             : Result := varNull;
+    LUA_TNIL             : Result := Null;
     LUA_TBOOLEAN         : Result := VarAsType(lua_toboolean(L, Index), varBoolean);
     LUA_TNUMBER          : begin
                              dataNum :=lua_tonumber(L, Index);
