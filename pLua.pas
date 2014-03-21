@@ -77,11 +77,11 @@ function plua_callfunction( L: PLua_State; FunctionName : AnsiString;
                             CdataHandler:TLuaCdataHandler = nil) : Integer;
 
 procedure plua_pushvariant( L : PLua_State; const v : Variant; VariantHandler:TLuaVariantHandler = nil);
-procedure plua_pushvariants( L : PLua_State; const v : array of Variant; VariantHandler:TLuaVariantHandler = nil);
+procedure plua_pushvariants( L : PLua_State; const v : array of Variant; ReverseOrder:boolean; VariantHandler:TLuaVariantHandler = nil);
 function  plua_popvariant( L : PLua_State; CdataHandler:TLuaCdataHandler = nil ):Variant;
 procedure plua_pushstrings( L : PLua_State; S : TStrings );
 procedure plua_popstrings( L : PLua_State; S : TStrings; Keys:TStrings = nil );
-function  plua_popvariants( L : PLua_State; count:integer; CdataHandler:TLuaCdataHandler = nil ):TVariantArray;
+function  plua_popvariants( L : PLua_State; count:integer; ReverseOrder:boolean; CdataHandler:TLuaCdataHandler = nil ):TVariantArray;
 
 //dumps function on top of stack to string (string.dump analog)
 function plua_popFuncDump( L : PLua_State ):string;
@@ -275,7 +275,7 @@ begin
     end
     else
     begin
-      plua_pushvariants(l, args, VariantHandler);
+      plua_pushvariants(l, args, False, VariantHandler);
       NArgs := High(Args);
     end;
   if lua_pcall(l, NArgs+1, LUA_MULTRET, ErrHandler) <> 0 then
@@ -287,7 +287,7 @@ begin
   result := lua_gettop(l) - offset;
   if (Results<>Nil) then
     begin
-      Results^:=plua_popvariants(l, result, CdataHandler);
+      Results^:=plua_popvariants(l, result, True, CdataHandler);
     end;
 end;
 
@@ -360,11 +360,15 @@ begin
     end;
 end;
 
-procedure plua_pushvariants(L: PLua_State; const v: array of Variant; VariantHandler:TLuaVariantHandler);
+procedure plua_pushvariants(L: PLua_State; const v: array of Variant; ReverseOrder:boolean; VariantHandler:TLuaVariantHandler);
 var i:Integer;
 begin
-  for i:=0 to High(v) do
-    plua_pushvariant(l, v[i], VariantHandler);
+  if ReverseOrder then
+    for i:=High(v) downto 0 do
+      plua_pushvariant(l, v[i], VariantHandler)
+  else
+    for i:=0 to High(v) do
+      plua_pushvariant(l, v[i], VariantHandler);
 end;
 
 function plua_popvariant(L: PLua_State; CdataHandler:TLuaCdataHandler): Variant;
@@ -423,17 +427,23 @@ begin
     end;
 end;
 
-function plua_popvariants(L: PLua_State; count: integer; CdataHandler:TLuaCdataHandler): TVariantArray;
+function plua_popvariants(L: PLua_State; count: integer; ReverseOrder:boolean; CdataHandler:TLuaCdataHandler): TVariantArray;
 //pops 'count' elements from stack into TVariantArray
 //reverses element order
 //supports count = 0
 var i:Integer;
 begin
   SetLength(Result, count);
-  for i:=0 to count-1 do
-    begin
-      Result[count - 1 - i]:=plua_popvariant(L, CdataHandler);
-    end;
+  if ReverseOrder then
+    for i:=0 to count-1 do
+      begin
+        Result[count - 1 - i]:=plua_popvariant(L, CdataHandler);
+      end
+    else
+    for i:=0 to count-1 do
+      begin
+        Result[i]:=plua_popvariant(L, CdataHandler);
+      end;
 end;
 
 function plua_popFuncDump(L: PLua_State): string;

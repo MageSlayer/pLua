@@ -456,12 +456,12 @@ begin
     TopBeforeExecute:=lua_gettop(l); //have to be called immediately before luaL_loadstring
 
     LoadScriptStr(Script);
-    plua_pushvariants(l, args, VariantHandler);
+    plua_pushvariants(l, args, False, VariantHandler);
     ExecuteScript(Length(args), LUA_MULTRET);
     if Results <> nil then
       begin
         result_count:=lua_gettop(l) - TopBeforeExecute;
-        Results^:=plua_popvariants(l, result_count, CdataHandler);
+        Results^:=plua_popvariants(l, result_count, True, CdataHandler);
       end;
   finally
     plua_EnsureStackBalance(l, StartTop);
