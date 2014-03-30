@@ -124,7 +124,7 @@ procedure plua_EnsureStackBalance(l: PLua_State; TopToBe:Integer);
 //pops all values from stack
 procedure plua_ClearStack(l: PLua_State);
 
-//Balance Lua stacka and throw exception
+//Balance Lua stack and throw exception
 procedure plua_RaiseException(l: PLua_State; const ErrMes:string);overload;
 procedure plua_RaiseException(l: PLua_State; const ErrMes:string; const Params:array of const);overload;
 procedure plua_RaiseException(l: PLua_State; TopToBe:Integer; const ErrMes:string);overload;
@@ -136,8 +136,8 @@ function plua_FunctionCompile(l: PLua_State; const FuncCode:string):integer;over
 function plua_FunctionCompile(l: PLua_State; const FuncCode:string; const Substs:array of const):integer;overload;
 
 //report error from lua called functions
-//no need to balance stack if called from functions registered via plua_RegisterMethod
-//otherwise use plua_RaiseException
+//can't deal properly with Pascal exceptions under x86/32bit platforms!!!
+//Use plua_RaiseException instead
 procedure lua_reporterror(l : PLua_State; const ErrMes:string);
 procedure lua_reporterror(l : PLua_State; const ErrMes:string; const Params:array of const);
 
@@ -163,17 +163,24 @@ implementation
 uses
   Variants;
 
+{$IFDEF LUAJIT_EXCEPTION_SUPPORT}
 procedure lua_reporterror(l : PLua_State; const ErrMes:string);
 begin
-  {$IFDEF LUAJIT_EXCEPTION_SUPPORT}
   //LuaJit wants native exceptions, not longjmp!
   raise LuaException.Create(ErrMes);
-  {$ELSE}
+end;
+{$ENDIF}
+
+{$IFNDEF LUAJIT_EXCEPTION_SUPPORT}
+{$IMPLICITEXCEPTIONS OFF}
+procedure lua_reporterror(l : PLua_State; const ErrMes:string);
+begin
   assert(L <> nil, 'Lua state is nil');
   lua_pushstring(L, PChar(ErrMes));
   lua_error(L); //does longjmp, almost the same as exception raising
-  {$ENDIF}
 end;
+{$IMPLICITEXCEPTIONS ON}
+{$ENDIF}
 
 procedure lua_reporterror(l: PLua_State; const ErrMes: string; const Params: array of const);
 begin
@@ -811,8 +818,8 @@ end;
 
 procedure plua_RaiseException(l: PLua_State; const ErrMes: string);
 begin
-  //raise LuaException.Create(ErrMes);
-  lua_reporterror(l, ErrMes);
+  raise LuaException.Create(ErrMes);
+  //lua_reporterror(l, ErrMes);
 end;
 
 procedure plua_RaiseException(l: PLua_State; const ErrMes: string; const Params: array of const);

@@ -86,7 +86,7 @@ procedure FindFilesArgs(l : Plua_State; paramcount: Integer;
                         out Dir:string; out Recursive:boolean; out Mask:string );
 begin
   if not (paramcount in [2,3]) then
-     lua_reporterror(l, 'Dir, Recursive, [Mask] are expected.');
+     pLua_RaiseException(l, 'Dir, Recursive, [Mask] are expected.');
 
   if paramcount < 3 then
     begin
@@ -130,13 +130,13 @@ var paramcount:Integer;
 begin
   paramcount:=lua_gettop(l);
   if paramcount <> 2 then
-    lua_reporterror(l, 'Invalid findfiles_iterator params');
+    pLua_RaiseException(l, 'Invalid findfiles_iterator params');
 
   //second param is not used actually
   lua_pop(l, 1);
 
   if not lua_isuserdata(l, -1) then
-    lua_reporterror(l, 'Invalid findfiles_iterator param1');
+    pLua_RaiseException(l, 'Invalid findfiles_iterator param1');
 
   user_obj:=lua_touserdata(l, -1);
   f:=TFindFilesIterator(user_obj^).FetchNext;
@@ -219,27 +219,27 @@ var Filename:string;
 begin
   Result:=0;
   if paramcount <> 1 then
-    lua_reporterror(l, 'Filename is expected.');
+    pLua_RaiseException(l, 'Filename is expected.');
 
   Filename:=plua_tostring(l, -1);
   lua_pop(l, 1);
 
   //modification time
   if not FileAge(Filename, MTime, True) then
-    lua_reporterror(l, 'Error getting file modification time.');
+    pLua_RaiseException(l, 'Error getting file modification time.');
   lua_pushnumber(l, MTime);
 
   //creation time
   {$IFDEF LINUX}
   if FpStat(Filename, {%H-}fstat)<>0 then
-    lua_reporterror(l, 'Error getting file creation time.');
+    pLua_RaiseException(l, 'Error getting file creation time.');
   CTime:=FileDatetoDateTime(fstat.st_ctime);
   {$ENDIF}
   {$IFDEF WINDOWS}
   if FindFirst(FileName, faAnyFile, fl) <> 0 then
     begin
       FindClose(fl);
-      lua_reporterror(l, 'Error getting file creation time.');
+      pLua_RaiseException(l, 'Error getting file creation time.');
     end;
   CTime:=FileTime2DateTime(fl.FindData.ftCreationTime);
   FindClose(fl);
@@ -262,21 +262,21 @@ begin
   Result:=0;
 
   if paramcount <> 1 then
-    lua_reporterror(l, 'Filename is expected.');
+    pLua_RaiseException(l, 'Filename is expected.');
 
   Filename:=plua_tostring(l, -1);
   lua_pop(l, 1);
 
   {$IFDEF LINUX}
   if FpStat(Filename, {%H-}fstat)<>0 then
-    lua_reporterror(l, 'Error getting file size.');
+    pLua_RaiseException(l, 'Error getting file size.');
   S:=fstat.st_size;
   {$ENDIF}
   {$IFDEF WINDOWS}
   if FindFirst(FileName, faAnyFile, fl) <> 0 then
     begin
       FindClose(fl);
-      lua_reporterror(l, 'Error getting file size.');
+      pLua_RaiseException(l, 'Error getting file size.');
     end;
   S:=((int64(fl.FindData.nFileSizeHigh)) shl 32) + fl.FindData.nFileSizeLow;
   FindClose(fl);
@@ -299,7 +299,7 @@ begin
   Result:=0;
 
   if paramcount <> 1 then
-    lua_reporterror(l, 'Filename is expected.');
+    pLua_RaiseException(l, 'Filename is expected.');
 
   Filename:=plua_tostring(l, -1);
   lua_pop(l, 1);
@@ -318,13 +318,13 @@ begin
   Result:=0;
 
   if paramcount <> 1 then
-    lua_reporterror(l, 'Filename is expected.');
+    pLua_RaiseException(l, 'Filename is expected.');
 
   Filename:=plua_tostring(l, -1);
   lua_pop(l, 1);
 
   if not FileExists(Filename) then
-    lua_reporterror(l, 'File %s does not exist.', [FileName]);
+    pLua_RaiseException(l, 'File %s does not exist.', [FileName]);
 
 
   AssignFile(f, Filename);
@@ -536,4 +536,3 @@ begin
 end;
 
 end.
-
