@@ -139,7 +139,6 @@ type
     procedure ObjSetEmpty(const varName:String);
     function  ObjGet(const varName:string):TObject;
 
-    procedure GlobalObjClear;
     procedure GlobalVarClear(const varName:string);
     procedure GlobalObjectNames(List: TStrings; LuaTypes: TLuaObjectTypes);
 
@@ -267,25 +266,21 @@ begin
   while i > -1 do
     begin
       nfo := PLuaInstanceInfo(FLuaObjects[i]);
-      if nfo^.l = l then
+      if LeakWarnings then
         begin
-          if LeakWarnings then
-            begin
-              //we cannot trust nfo^.obj is still valid here, so do not try to read ClassName via nfo^.obj.
-              //use only debug info when accesible.
-              if nfo^.LuaRef <> LUA_NOREF then
-                 LogDebug('Lua object $%P (%s) has lua ref (%d) unfreed.',
-                          [ Pointer(nfo^.obj), {$IFDEF DEBUG}nfo^.ClassName{$ELSE}'unknown'{$ENDIF}, nfo^.LuaRef ]);
+          //we cannot trust nfo^.obj is still valid here, so do not try to read ClassName via nfo^.obj.
+          //use only debug info when accesible.
+          if nfo^.LuaRef <> LUA_NOREF then
+             LogDebug('Lua object $%P (%s) has lua ref (%d) unfreed.',
+                      [ Pointer(nfo^.obj), {$IFDEF DEBUG}nfo^.ClassName{$ELSE}'unknown'{$ENDIF}, nfo^.LuaRef ]);
 
-              LogDebug('Lua object $%P (%s) memory leak. Freeing...', [ Pointer(nfo^.obj), {$IFDEF DEBUG}nfo^.ClassName{$ELSE}'unknown'{$ENDIF} ]);
-            end;
-
-          plua_ref_release( l, nfo );
-          try
-            LuaObjects_Free( TLuaInternalState(Self), nfo );
-          except
-          end;
+          LogDebug('Lua object $%P (%s) memory leak. Freeing...', [ Pointer(nfo^.obj), {$IFDEF DEBUG}nfo^.ClassName{$ELSE}'unknown'{$ENDIF} ]);
         end;
+
+      try
+        LuaObjects_Free( TLuaInternalState(Self), nfo );
+      except
+      end;
       dec(i);
     end;
 end;
@@ -798,16 +793,17 @@ begin
   FErrHandler:=-1;
   if L <> nil then
     begin
+      lua_close(L);
+      L := nil;
+
       ClearObjects(True);
       ClearRecords;
-      lua_close(L);
 
       if FLuaSelf <> nil then
         begin
           plua_instance_free(nil, FLuaSelf);
         end;
     end;
-  L := nil;
 
   FLibFile:='';
   FScript:='';
@@ -1091,11 +1087,6 @@ end;
 function TLUA.ObjGet(const varName: string): TObject;
 begin
   Result:=plua_GlobalObjectGet(l, varName);
-end;
-
-procedure TLUA.GlobalObjClear;
-begin
-  ClearObjects(False);
 end;
 
 procedure TLUA.GlobalVarClear(const varName: string);
