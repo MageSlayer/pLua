@@ -109,6 +109,10 @@ procedure plua_RegisterMethod( l : Plua_State; aMethodName : AnsiString;
 procedure plua_RegisterMethod(l : PLua_State; const aMethodName:string; Func:TLuaProc);overload;
 procedure plua_RegisterMethod(l : PLua_State; const aPackage, aMethodName:string; Func:TLuaProc);overload;
 
+//assign metatable for userdata ( it cannot be done directly in Lua )
+//must be exported to Lua manually
+function plua_helper_setmetatable(l : PLua_State; paramcount: Integer) : integer;
+
 procedure plua_GetTableKey( l : PLua_State; TableIndex : Integer; KeyName : AnsiString );
 
 //parses full function name (with dots) into package + simple name
@@ -752,6 +756,26 @@ begin
   lua_pushliteral(l, PChar(aMethodName));
   lua_pushcfunction(l, MethodPtr);
   lua_settable(l, totable);
+end;
+
+function plua_helper_setmetatable(l: PLua_State; paramcount: Integer): integer;
+begin
+  result := 0;
+  if (paramcount <> 2) then
+    plua_RaiseException(l, 'Parameter number must be 2 (plua_helper_setmetatable)')
+    else
+    begin
+      // parameter order is the same as for setmetatable of Lua - (x, mt)
+      if lua_type(l, -1) <> LUA_TTABLE then
+        plua_RaiseException(l, 'Parameter #2 must be metatable (plua_helper_setmetatable)');
+      if lua_type(l, -2) <> LUA_TUSERDATA then
+        plua_RaiseException(l, 'Parameter #1 must be userdata (plua_helper_setmetatable)');
+
+      lua_setmetatable(l, -2);
+
+      //remove x from stack
+      lua_pop(l, 1);
+    end;
 end;
 
 procedure plua_GetTableKey(l: PLua_State; TableIndex: Integer;
