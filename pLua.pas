@@ -113,6 +113,11 @@ procedure plua_RegisterMethod(l : PLua_State; const aPackage, aMethodName:string
 //must be exported to Lua manually
 function plua_helper_setmetatable(l : PLua_State; paramcount: Integer) : integer;
 
+//create a dummy userdata with zero size.
+//useful, e.g. for attaching metatable to ordinary Lua tables
+//must be exported to Lua manually
+function plua_helper_userdata_dummy(l : PLua_State; paramcount: Integer) : integer;
+
 procedure plua_GetTableKey( l : PLua_State; TableIndex : Integer; KeyName : AnsiString );
 
 //parses full function name (with dots) into package + simple name
@@ -775,6 +780,18 @@ begin
 
       //remove x from stack
       lua_pop(l, 1);
+    end;
+end;
+
+function plua_helper_userdata_dummy(l: PLua_State; paramcount: Integer): integer;
+begin
+  result := 0;
+  if (paramcount <> 0) then
+    plua_RaiseException(l, 'Parameter number must be 0 (plua_helper_userdata_dummy)')
+    else
+    begin
+      lua_newuserdata(l, 0);
+      result := 1;
     end;
 end;
 
