@@ -35,6 +35,7 @@ type
     FScript,
     FLibFile,
     FLibName: AnsiString;
+    FErrHandlerFunc: AnsiString;
     FMethods : TStringList;
     FErrHandler: Integer;
 
@@ -142,6 +143,7 @@ type
     procedure GlobalVarClear(const varName:string);
     procedure GlobalObjectNames(List: TStrings; LuaTypes: TLuaObjectTypes);
 
+    property ErrHandlerFunc : AnsiString read FErrHandlerFunc write FErrHandlerFunc;
     property ScriptText: AnsiString read FScript write FScript;
     property ScriptFile: AnsiString read FLibFile write FLibFile;
     property LibName  : AnsiString read FLibName write SetLibName;
@@ -640,10 +642,13 @@ end;
 function TLUA.FunctionExists(const Package, aMethodName: AnsiString): Boolean;
 var TopToBe, TableIdx:Integer;
 begin
+  Result := False;
   TopToBe:=lua_gettop(l);
   try
     lua_pushstring(L, PChar(Package));
     lua_gettable(L, LUA_GLOBALSINDEX);
+    if lua_isnil(L, -1) then Exit;
+
     TableIdx:=lua_gettop(l);
     Result:=FunctionExists(aMethodName, TableIdx);
   finally
@@ -810,13 +815,29 @@ begin
 end;
 
 procedure TLUA.PushErrorHandler;
+var Package, FName : string;
+    std_handler : boolean;
 begin
+  std_handler := true;
+  if FErrHandlerFunc <> '' then
+    begin
+      plua_FuncNameParse(FErrHandlerFunc, Package, FName);
+      std_handler :=not ( (Package <> '') and (FName <> '') and FunctionExists(Package, FName) );
+    end;
+
+  if std_handler then
+    begin
+      // standard Lua stack tracer by default
+      Package := 'debug';
+      FName   := 'traceback';
+    end;
+
   //push error handler on stack to be able to reference it everywhere
   // http://tinylittlelife.org/?p=254
-  lua_getglobal(L, 'debug');
+  lua_getglobal(L, PChar(Package));
   //-1 is the top of the stack
-  lua_getfield(L, -1, 'traceback');
-  //traceback is on top, remove debug from 2nd spot
+  lua_getfield(L, -1, PChar(FName));
+  //traceback is on top, remove package name from 2nd spot
   lua_remove(L, -2);
   FErrHandler:=lua_gettop(L);
 end;
