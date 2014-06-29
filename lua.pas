@@ -48,7 +48,8 @@ const
 {$ELSE}
   //LuaDLL = 'lua5.1.so';
   {$IFDEF LUAJIT}
-  LuaDLL = 'libluajit-2.0.so';
+  //LuaDLL = 'libluajit-2.0.so';
+  LuaDLL = 'libluajit-5.1.so'; // seems like it's the generally accepted library name for LuaJIT
   {$ELSE}
   LuaDLL = 'liblua.so.5';
   {$ENDIF}
