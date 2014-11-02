@@ -359,6 +359,22 @@ begin
   Result:=1;
 end;
 
+function plua_dir_create(l : PLua_State; paramcount: Integer) : integer;
+var Dir:string;
+begin
+  Result:=0;
+
+  if paramcount <> 1 then
+    pLua_RaiseException(l, 'Directory name is expected.');
+
+  Dir:=plua_tostring(l, -1);
+  lua_pop(l, 1);
+
+  lua_pushboolean(l, ForceDirectories(Dir) );
+
+  Result:=1;
+end;
+
 function plua_process_messages(l : PLua_State; {%H-}paramcount: Integer) : integer;
 begin
   Application.ProcessMessages;
@@ -374,6 +390,7 @@ begin
   plua_RegisterMethod(l, Package_fs, 'filesize', @plua_file_size);
   plua_RegisterMethod(l, Package_fs, 'fileexists', @plua_file_exists);
   plua_RegisterMethod(l, Package_fs, 'fileslurp', @plua_file_slurp);
+  plua_RegisterMethod(l, Package_fs, 'dircreate', @plua_dir_create);
 end;
 
 procedure plua_dbg_register(L: Plua_State);
