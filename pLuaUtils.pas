@@ -375,6 +375,24 @@ begin
   Result:=1;
 end;
 
+function plua_parse_filename(l : PLua_State; paramcount: Integer) : integer;
+var Filename:string;
+begin
+  Result:=0;
+
+  if paramcount <> 1 then
+    pLua_RaiseException(l, 'File name is expected.');
+
+  Filename:=plua_tostring(l, -1);
+  lua_pop(l, 1);
+
+  plua_pushstring(l, ExtractFilePath(Filename));
+  plua_pushstring(l, ExtractFileName(Filename));
+  plua_pushstring(l, ExtractFileExt(Filename));
+
+  Result:=3;
+end;
+
 function plua_process_messages(l : PLua_State; {%H-}paramcount: Integer) : integer;
 begin
   Application.ProcessMessages;
@@ -391,6 +409,7 @@ begin
   plua_RegisterMethod(l, Package_fs, 'fileexists', @plua_file_exists);
   plua_RegisterMethod(l, Package_fs, 'fileslurp', @plua_file_slurp);
   plua_RegisterMethod(l, Package_fs, 'dircreate', @plua_dir_create);
+  plua_RegisterMethod(l, Package_fs, 'parsefilename', @plua_parse_filename);
 end;
 
 procedure plua_dbg_register(L: Plua_State);
