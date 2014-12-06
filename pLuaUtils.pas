@@ -21,7 +21,7 @@ procedure plua_fs_register(L:Plua_State);
 procedure plua_dbg_register(L:Plua_State);
 
 implementation
-uses Forms, gstack, pLuaObject;
+uses Forms, gstack, masks, pLuaObject;
 
 const
   Package_fs = 'fs';
@@ -375,6 +375,14 @@ begin
   Result:=1;
 end;
 
+function ExtractFilenameOnly(const Filename:string):string;
+var F, Ext:string;
+begin
+  F:=ExtractFileName(Filename);
+  Ext:=ExtractFileExt(F);
+  Result := Copy(F, 1, Length(F) - Length(Ext))
+end;
+
 function plua_parse_filename(l : PLua_State; paramcount: Integer) : integer;
 var Filename:string;
 begin
@@ -388,9 +396,33 @@ begin
 
   plua_pushstring(l, ExtractFilePath(Filename));
   plua_pushstring(l, ExtractFileName(Filename));
+  plua_pushstring(l, ExtractFilenameOnly(Filename));
   plua_pushstring(l, ExtractFileExt(Filename));
 
-  Result:=3;
+  Result:=4;
+end;
+
+function plua_match_mask(l : PLua_State; paramcount: Integer) : integer;
+var Filename, mask:string;
+    case_sens:boolean;
+begin
+  Result:=0;
+
+  if paramcount <> 3 then
+    pLua_RaiseException(l, 'File name, mask and is_case_sensitive are expected.');
+
+  case_sens:=lua_toboolean(l, -1);
+  lua_pop(l, 1);
+
+  mask:=plua_tostring(l, -1);
+  lua_pop(l, 1);
+
+  Filename:=plua_tostring(l, -1);
+  lua_pop(l, 1);
+
+  lua_pushboolean(l, MatchesMask(Filename, mask, case_sens));
+
+  Result:=1;
 end;
 
 function plua_process_messages(l : PLua_State; {%H-}paramcount: Integer) : integer;
@@ -410,6 +442,7 @@ begin
   plua_RegisterMethod(l, Package_fs, 'fileslurp', @plua_file_slurp);
   plua_RegisterMethod(l, Package_fs, 'dircreate', @plua_dir_create);
   plua_RegisterMethod(l, Package_fs, 'parsefilename', @plua_parse_filename);
+  plua_RegisterMethod(l, Package_fs, 'matchmask', @plua_match_mask);
 end;
 
 procedure plua_dbg_register(L: Plua_State);
