@@ -31,6 +31,7 @@ type
     FOnException: TLuaOnException;
     FOnLoadLibs: TLuaOnLoadLibs;
     FUseDebug: Boolean;
+    FUserObj: TObject;
     L : Plua_State;
     FScript,
     FLibFile,
@@ -67,6 +68,7 @@ type
     procedure SetUseDebug(const AValue: Boolean);
     procedure ErrorTest(errCode : Integer);
     procedure HandleException(E : Exception);
+    procedure SetUserObj(AValue: TObject);
     procedure SetValue(valName : AnsiString; const AValue: Variant);
     procedure ExecuteScript(NArgs, NResults:integer);
   public
@@ -154,6 +156,8 @@ type
     property Value[valName : AnsiString] : Variant read GetValue write SetValue; default;
     property OnException : TLuaOnException read FOnException write SetOnException;
     property OnLoadLibs : TLuaOnLoadLibs read FOnLoadLibs write SetOnLoadLibs;
+    // singleton user-defined object. Freed on assign/destroy
+    property UserObj : TObject read FUserObj write SetUserObj;
   end;
 
   TLuaInternalState = class(TLua)
@@ -235,6 +239,7 @@ begin
   {$IFDEF TLuaAsComponent}inherited;{$ENDIF}
   FUseDebug := false;
   FMethods := TStringList.Create;
+  FUserObj := nil;
 
   FLuaObjects := TList.Create;
   FLuaClasses := TLuaClassList.Create;
@@ -307,6 +312,7 @@ var instance:PLuaInstanceInfo;
     rec_instance:PLuaRecordInstanceInfo;
 begin
   Close;
+  FreeAndNil(FUserObj);
   FMethods.Free;
   FreeAndNil(FLuaObjects);
   FreeAndNil(FLuaClasses);
@@ -1020,6 +1026,13 @@ begin
     //To raise the same exception, we need to construct another object.
     //Otherwise it will crash later.
     raise LuaException.Create(E.Message + sLineBreak + ExceptionBackTrace);
+end;
+
+procedure TLUA.SetUserObj(AValue: TObject);
+begin
+  if FUserObj = AValue then Exit;
+  FreeAndNil(FUserObj);
+  FUserObj := AValue;
 end;
 
 procedure TLUA.SetValue(valName : AnsiString; const AValue: Variant);
