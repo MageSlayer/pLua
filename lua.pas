@@ -9,6 +9,10 @@ unit lua;
 
 interface
 
+{$IFDEF FPC}
+  {$T+} // typed pointers
+{$ENDIF}
+
 {$IFDEF UNIX}
 uses
   dl;
@@ -227,6 +231,26 @@ type
   (* type for integer functions *)
   lua_Integer = LUA_INTEGER_;
 
+{$IFDEF LUAJIT}
+// internal LuaJIT types/structs
+const
+  LuaJIT_CTID_CTYPEID = 21;         // see CTTYDEF in lj_ctypes.h
+  LuaJIT_CTID_INVALID = $ffffffff;
+type
+  LuaJIT_CTypeID   = UInt32;
+  PLuaJIT_CTypeID  = ^LuaJIT_CTypeID;
+
+  LuaJIT_CTypeID1  = UInt16;
+  PLuaJIT_CTypeID1 = ^LuaJIT_CTypeID1;
+
+  LuaJIT_GCHeader = array[0..5] of byte; // opaque structure
+  LuaJIT_GCcdata  = packed record        // see GCcdata in lj_obj.h
+    gcheader : LuaJIT_GCHeader;
+    ctypeid : LuaJIT_CTypeID1;          // warning 16bit field instead!!!
+  end;
+  PLuaJIT_GCcdata = ^LuaJIT_GCcdata;
+{$ENDIF}
+
 (*
 ** state manipulation
 *)
@@ -306,6 +330,10 @@ function lua_tothread(L : Plua_State; idx : Integer) : Plua_State;
 function lua_topointer(L : Plua_State; idx : Integer) : Pointer;
   extdecl; external LuaDLL;
 
+{$IFDEF LUAJIT}
+function luajit_tocdata(L : Plua_State; idx : Integer; out ctypeid : LuaJIT_CTypeID) : Pointer;
+function luajit_getctypeid(L : Plua_State; typename : PChar; out ctypeid : LuaJIT_CTypeID):boolean;
+{$ENDIF}
 
 (*
 ** push functions (C -> stack)
@@ -1072,6 +1100,79 @@ begin
   lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
 end;
 
+{$IFDEF LUAJIT}
+function luajit_tocdata(L : Plua_State; idx : Integer; out ctypeid : LuaJIT_CTypeID) : Pointer;
+var T:Integer;
+    p : Pointer;
+    cd : PLuaJIT_GCcdata;
+begin
+  Result := nil;
+  ctypeid:= LuaJIT_CTID_INVALID;
+
+  T:=lua_type(l, -1);
+  if T <> LUA_TCDATA then
+    Exit;
+
+  p := lua_topointer(l, idx);
+  if p = nil then
+    Exit;
+
+  cd := PLuaJIT_GCcdata( PByte(p) - sizeof(LuaJIT_GCcdata) );
+  ctypeid:=cd^.ctypeid;
+
+  Result := p;
+end;
+
+function luajit_getctypeid(L : Plua_State; typename : PChar; out ctypeid : LuaJIT_CTypeID):boolean;
+var idx : Integer;
+    cd : PLuaJIT_GCcdata;
+    p : Pointer;
+    typeof_success : boolean;
+begin
+  Result := false;
+  ctypeid := LuaJIT_CTID_INVALID;
+
+  idx := lua_gettop(L);
+  try
+    // Get ref to ffi.typeof
+    luaL_loadstring(L, 'return require("ffi").typeof');
+
+    // lua_call must be wrapped by try .. except
+    typeof_success := false;
+    try
+      lua_call(L, 0, 1);
+      if not lua_isfunction(L, -1) then
+        Exit;
+      // Push the first argument to ffi.typeof
+      lua_pushstring(L, typename);
+      // Call ffi.typeof()
+      lua_call(L, 1, 1);
+      typeof_success := true;
+    except
+    end;
+    if not typeof_success then
+      Exit;
+
+    // Returned type should be LUA_TCDATA with CTID_CTYPEID
+    if lua_type(L, -1) <> LUA_TCDATA then
+      Exit;
+
+    p := lua_topointer(l, -1);
+    if p = nil then
+      Exit;
+
+    cd := PLuaJIT_GCcdata( PByte(p) - sizeof(LuaJIT_GCcdata) );
+    if cd^.ctypeid <> LuaJIT_CTID_CTYPEID then
+      Exit;
+
+    ctypeid := PLuaJIT_CTypeID(p)^;
+    Result := True;
+  finally
+    // balance Lua stack
+    lua_settop(L, idx);
+  end;
+end;
+{$ENDIF}
 
 (******************************************************************************
 * Original copyright for the lua source and headers:
