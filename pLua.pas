@@ -46,7 +46,12 @@ const
     {$ENDIF}
   {$ENDIF}
   {$IFDEF UNIX}
-    LpegLib = 'liblpeg.so'
+    {$IFDEF CPU32}
+    LpegLib = 'lpeg.so'
+    {$ENDIF}
+    {$IFDEF CPU64}
+    LpegLib = 'lpeg-x64.so'
+    {$ENDIF}
   {$ENDIF}
   ;
 //register Lpeg in Lua instance
