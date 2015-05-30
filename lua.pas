@@ -264,6 +264,10 @@ function  lua_newthread(L : Plua_State) : Plua_State;
 function  lua_atpanic(L : Plua_State; panicf : lua_CFunction) : lua_CFunction;
   extdecl; external LuaDLL;
 
+{$IFDEF LUA_BREAK_SUPPORT}
+procedure  lua_breakpressed_handler(L : Plua_State; func:Pointer; self:pointer);
+  extdecl; external LuaDLL;
+{$ENDIF}
 
 (*
 ** basic stack manipulation
