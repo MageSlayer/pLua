@@ -217,22 +217,38 @@ uses
 
 function  plua_GetEventDeletage(S: TLuaInternalState; Obj : TObject ) : TLuaObjectEventDelegate;forward;
 
+function ClassMetaTableName(const ClassName:string):string;
+begin
+  Result:=ClassName+'_mt';
+end;
+
 function ClassMetaTableName(cinfo:PLuaClassInfo):string;
 begin
-  //using PChar(cinfo^.ClassName+'_mt') gives various hard to trace bugs and memory leaks
-  Result:=cinfo^.ClassName+'_mt';
+  Result:=ClassMetaTableName(cinfo^.ClassName);
+end;
+
+function ClassProcsMetaTableName(const ClassName:string):string;
+begin
+  //Return metatable name for class methods metatable
+  Result:=ClassName+'_mt_procs';
 end;
 
 function ClassProcsMetaTableName(cinfo:PLuaClassInfo):string;
 begin
   //Return metatable name for class methods metatable
-  Result:=cinfo^.ClassName+'_mt_procs';
+  Result:=ClassProcsMetaTableName(cinfo^.ClassName);
+end;
+
+function ClassPropsMetaTableName(const ClassName:string):string;
+begin
+  //Return metatable name for class properties metatable
+  Result:=ClassName+'_mt_props';
 end;
 
 function ClassPropsMetaTableName(cinfo:PLuaClassInfo):string;
 begin
   //Return metatable name for class properties metatable
-  Result:=cinfo^.ClassName+'_mt_props';
+  Result:=ClassPropsMetaTableName(cinfo^.ClassName);
 end;
 
 function plua_ref_release(l : PLua_State; obj_ref:Integer):boolean;overload;
@@ -437,173 +453,238 @@ begin
   //plua_ref_release(l, ref);
 end;
 
-procedure plua_registerclass(l: PLua_State; classInfo: PLuaClassInfo);
-var midx, StartTop, i, err : integer;
-    registered:boolean;
-    ClassMetaTable, ProcsMetaTable, PropsMetaTable, FuncCode:string;
-    S:TLuaInternalState;
+procedure plua_pushmethod(l: PLua_State; const MethodName:string; wrapper:plua_ClassMethodWrapper);
+//pushes wrapper method on Lua stack
 begin
-  LogDebug('Registering class %s.', [classInfo^.ClassName]);
+  plua_pushstring(L, MethodName);
+  lua_pushlightuserdata(l, Pointer(wrapper));
+  lua_pushcclosure(L, @plua_call_method, 1);
+end;
 
-  StartTop := lua_gettop(l);
+type
+  TRegisterClassInfo = record
+    ClassMetaTable : string;
+    ProcsMetaTable : string;
+    PropsMetaTable : string;
+  end;
 
+function plua_registerclass_createmt(l: PLua_State; const ClassName: string; ClassId : TLuaClassId; out R:TRegisterClassInfo):boolean;
+// Creates metatable for given class info
+var
+  S:TLuaInternalState;
+begin
+  Result:=False;
   //already registered?
-  ClassMetaTable:=ClassMetaTableName(classInfo);
-  luaL_getmetatable(l, PChar(ClassMetaTable) );
+  R.ClassMetaTable:=ClassMetaTableName(ClassName);
+  luaL_getmetatable(l, PChar(R.ClassMetaTable) );
   if lua_istable(l, -1) then
     begin
-      plua_EnsureStackBalance(l, StartTop);
-      plua_releaseClassInfo(classInfo);
+      LogDebug('Skipping registering class %s. Metatable already registered', [ClassName]);
       Exit;
     end;
   lua_pop(l, 1);
 
   S:=LuaSelf(l);
   //skip re-registering classes.
-  if S.LuaClasses.IndexOf( classinfo^.ClassName ) <> -1 then
+  if S.LuaClasses.IndexOf( ClassName ) <> -1 then
     begin
-      LogDebug('Skipping registering class %s. Already registered', [classInfo^.ClassName]);
-
-      plua_releaseClassInfo(classInfo);
+      LogDebug('Skipping registering class %s. Already registered', [ClassName]);
       Exit;
     end;
 
-  S.LuaClasses.Add(classInfo);
-
-  plua_pushstring(l, classInfo^.ClassName);
+  plua_pushstring(l, ClassName);
   lua_newtable(l);
 
   //assign internal class id to class table
   lua_pushstring(L, '__ClassId');
-  lua_pushlightuserdata(L, classInfo^.ClassId);
+  lua_pushlightuserdata(L, ClassId);
   lua_rawset(L, -3);
 
-  ProcsMetaTable:=ClassProcsMetaTableName(classInfo);
-  PropsMetaTable:=ClassPropsMetaTableName(classInfo);
+  R.ProcsMetaTable:=ClassProcsMetaTableName(ClassName);
+  R.PropsMetaTable:=ClassPropsMetaTableName(ClassName);
 
-  if luaL_newmetatable(l, PChar(ClassMetaTable) ) <> 1 then
+  if luaL_newmetatable(l, PChar(R.ClassMetaTable) ) <> 1 then
     begin
-      plua_RaiseException(l, StartTop, 'Cannot create metatable for class %s', [classInfo^.ClassName]);
+      plua_RaiseException(l, 'Cannot create metatable for class %s', [ClassName]);
     end;
 
   lua_setmetatable(l, -2);
   lua_settable(l, LUA_GLOBALSINDEX);
+  Result:=True;
+end;
 
-  //Pseudo-code for metatables created below
-  // So, I just make a chain of metatables!
-  //
-  //  class_mt_props = {
-  //     getprop = plua_index_class,
-  //     setprop = plua_newindex_class
-  //  }
-  //
-  //  class_mt_procs = {
-  //     proc1 = plua_call_class_method,
-  //     proc2 = plua_call_class_method
-  //     ...
-  //  }
-  //
-  //  class_mt = {
-  //     __gc = plua_gc_class,
-  //     __call = plua_new_class
-  //     __index= function(v,x)
-  //         if (mt_procs[x] ~= nil) then
-  //           return mt_procs[x]
-  //         else
-  //           return (mt_props.getprop)(v, x)
-  //         end
-  //       end,
-  //     __newindex= function(t,p,val)
-  //        mt_props.setprop(t, p, val)
-  //      end
-  //  }
-  // setmetatable(obj, class_mt)
+procedure plua_registerclass(l: PLua_State; classInfo: PLuaClassInfo);
 
-  //create methods metatable
-  pLua_TableGlobalCreate(l, ProcsMetaTable);
+  procedure CreateProps(const R:TRegisterClassInfo);
+  var midx : integer;
+  begin
+    //create properties metatable
+    pLua_TableGlobalCreate(l, R.PropsMetaTable);
 
-  //create properties metatable
-  pLua_TableGlobalCreate(l, PropsMetaTable);
+    //attach property read/write handlers to properties metatable
+    lua_getglobal(l, PChar(R.PropsMetaTable) );
+    midx := lua_gettop(l);
 
-  //attach property read/write handlers to properties metatable
-  lua_getglobal(l, PChar(PropsMetaTable) );
-  midx := lua_gettop(l);
+    lua_pushstring(L, 'getprop');
+    lua_pushcfunction(L, @plua_index_class);
+    lua_rawset(L, midx);
 
-  lua_pushstring(L, 'getprop');
-  lua_pushcfunction(L, @plua_index_class);
-  lua_rawset(L, midx);
+    lua_pushstring(L, 'setprop');
+    lua_pushcfunction(L, @plua_newindex_class);
+    lua_rawset(L, midx);
 
-  lua_pushstring(L, 'setprop');
-  lua_pushcfunction(L, @plua_newindex_class);
-  lua_rawset(L, midx);
+    lua_pop(l, 1);
+  end;
 
-  lua_pop(l, 1);
+  procedure CreateMethods(const R:TRegisterClassInfo);
+  var midx, i: integer;
+  begin
+    //create methods metatable
+    pLua_TableGlobalCreate(l, R.ProcsMetaTable);
 
-  //attach properties metatable to methods metatable
-  //so properties metatable is searched only when no methods is found
-  lua_getglobal(l, PChar(ProcsMetaTable) );
-  midx := lua_gettop(l);
+    //attach properties metatable to methods metatable
+    //so properties metatable is searched only when no methods is found
+    lua_getglobal(l, PChar(R.ProcsMetaTable) );
+    midx := lua_gettop(l);
 
-  //populate class methods metatable
-  if Length(classInfo^.Methods) > 0 then
+    //populate class methods metatable
+    if Length(classInfo^.Methods) > 0 then
+        begin
+          LogDebug('Registering class methods.');
+          // TODO - Add parent method calls in
+          for i := 0 to High(classInfo^.Methods) do
+            begin
+              LogDebug('Registering class method %s.', [classInfo^.Methods[i].MethodName]);
+              with classInfo^.Methods[i] do
+                plua_pushmethod(L, MethodName, wrapper);
+              lua_rawset(l, midx);
+            end;
+          LogDebug('Registering class methods - done.');
+        end;
+    lua_pop(l, 1);
+  end;
+
+  procedure CreateStdMetaMethods(const R:TRegisterClassInfo);
+  var midx: integer;
+  begin
+    //populate main class metatable
+    luaL_getmetatable(l, PChar(R.ClassMetaTable) );
+    midx := lua_gettop(l);
+
+    lua_pushstring(L, '__call');
+    lua_pushcfunction(L, @plua_new_class);
+    lua_rawset(L, midx);
+
+    lua_pushstring(L, '__gc');
+    lua_pushcfunction(L, @plua_gc_class);
+    lua_rawset(L, midx);
+
+    //pop class metatable
+    lua_pop(l, 1);
+ end;
+
+  procedure CreateStdMethodPropSupport(const R:TRegisterClassInfo);
+  var midx, err : integer;
+  begin
+    //populate main class metatable
+    luaL_getmetatable(l, PChar(R.ClassMetaTable) );
+    midx := lua_gettop(l);
+
+    lua_pushstring(L, '__index');
+    err:=plua_FunctionCompile(l,
+            'function(v,x) ' + sLineBreak +
+            '     if (%mt_procs%[x] ~= nil) then ' + sLineBreak +
+            '        return %mt_procs%[x] ' + sLineBreak +
+            '     else ' + sLineBreak +
+            '        return (%mt_props%.getprop)(v, x) ' + sLineBreak +
+            '     end ' + sLineBreak +
+            'end',
+            ['%mt_procs%', R.ProcsMetaTable,
+             '%mt_props%', R.PropsMetaTable]);
+    if err <> 0 then
       begin
-        LogDebug('Registering class methods.');
-        // TODO - Add parent method calls in
-        for i := 0 to High(classInfo^.Methods) do
-          begin
-            LogDebug('Registering class method %s.', [classInfo^.Methods[i].MethodName]);
-            plua_pushstring(L, classInfo^.Methods[i].MethodName);
-            lua_pushlightuserdata(l, Pointer(classInfo^.Methods[i].wrapper));
-            lua_pushcclosure(L, @plua_call_method, 1);
-            lua_rawset(l, midx);
-          end;
-        LogDebug('Registering class methods - done.');
+        plua_RaiseException(l, 'Cannot compile __index function for class %s metatable', [classInfo^.ClassName]);
       end;
-  lua_pop(l, 1);
+    lua_rawset(L, midx);
 
-  //populate main class metatable
-  luaL_getmetatable(l, PChar(ClassMetaTable) );
-  midx := lua_gettop(l);
-
-  lua_pushstring(L, '__call');
-  lua_pushcfunction(L, @plua_new_class);
-  lua_rawset(L, midx);
-
-  lua_pushstring(L, '__gc');
-  lua_pushcfunction(L, @plua_gc_class);
-  lua_rawset(L, midx);
-
-  lua_pushstring(L, '__index');
-  err:=plua_FunctionCompile(l,
-          'function(v,x) ' + sLineBreak +
-          '     if (%mt_procs%[x] ~= nil) then ' + sLineBreak +
-          '        return %mt_procs%[x] ' + sLineBreak +
-          '     else ' + sLineBreak +
-          '        return (%mt_props%.getprop)(v, x) ' + sLineBreak +
-          '     end ' + sLineBreak +
+    lua_pushstring(L, '__newindex');
+    err:=plua_FunctionCompile(l,
+          'function(t,p,val) ' + sLineBreak +
+          '  %mt_props%.setprop(t, p, val) ' + sLineBreak +
           'end',
-          ['%mt_procs%', ProcsMetaTable,
-           '%mt_props%', PropsMetaTable]);
-  if err <> 0 then
-    begin
-      plua_RaiseException(l, StartTop, 'Cannot compile __index function for class %s metatable', [classInfo^.ClassName]);
-    end;
-  lua_rawset(L, midx);
+          ['%mt_props%', R.PropsMetaTable]);
+    if err <> 0 then
+      begin
+        plua_RaiseException(l, 'Cannot compile __newindex function for class %s metatable', [classInfo^.ClassName]);
+      end;
+    lua_rawset(L, midx);
 
-  lua_pushstring(L, '__newindex');
-  err:=plua_FunctionCompile(l,
-        'function(t,p,val) ' + sLineBreak +
-        '  %mt_props%.setprop(t, p, val) ' + sLineBreak +
-        'end',
-        ['%mt_props%', PropsMetaTable]);
-  if err <> 0 then
-    begin
-      plua_RaiseException(l, StartTop, 'Cannot compile __newindex function for class %s metatable', [classInfo^.ClassName]);
-    end;
-  lua_rawset(L, midx);
+    //pop class metatable
+    lua_pop(l, 1);
+  end;
 
-  //pop class metatable
-  lua_pop(l, 1);
+  procedure CreateStdClass(const R:TRegisterClassInfo);
+  begin
+    //Pseudo-code for metatables created below
+    // So, I just make a chain of metatables!
+    //
+    //  class_mt_props = {
+    //     getprop = plua_index_class,
+    //     setprop = plua_newindex_class
+    //  }
+    //
+    //  class_mt_procs = {
+    //     proc1 = plua_call_class_method,
+    //     proc2 = plua_call_class_method
+    //     ...
+    //  }
+    //
+    //  class_mt = {
+    //     __gc = plua_gc_class,
+    //     __call = plua_new_class
+    //     __index= function(v,x)
+    //         if (mt_procs[x] ~= nil) then
+    //           return mt_procs[x]
+    //         else
+    //           return (mt_props.getprop)(v, x)
+    //         end
+    //       end,
+    //     __newindex= function(t,p,val)
+    //        mt_props.setprop(t, p, val)
+    //      end
+    //  }
+    // setmetatable(obj, class_mt)
+
+    //create properties metatable
+    CreateProps(R);
+
+    //create methods metatable
+    CreateMethods(R);
+
+    CreateStdMetaMethods(R);
+    CreateStdMethodPropSupport(R);
+  end;
+
+var StartTop: integer;
+    R:TRegisterClassInfo;
+    S:TLuaInternalState;
+begin
+  LogDebug('Registering class %s.', [classInfo^.ClassName]);
+
+  StartTop := lua_gettop(l);
+
+  if not plua_registerclass_createmt(l, classInfo^.ClassName, classInfo^.ClassId, R) then
+    begin
+      plua_EnsureStackBalance(l, StartTop);
+      plua_releaseClassInfo(classInfo); // release class info as reference wasn't added to LuaClasses
+      LogDebug('Registering - skipped, already exists.');
+      Exit;
+    end;
+
+  S:=LuaSelf(l);
+  S.LuaClasses.Add(classInfo); // now LuaClasses become the owner of classInfo
+
+  CreateStdClass(R);
 
   plua_CheckStackBalance(l, StartTop);
 
