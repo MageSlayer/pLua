@@ -45,11 +45,24 @@ type
     ClassName   : AnsiString;
     New         : plua_ClassConstructor;
     Release     : plua_ClassDestructor;
+
     PropHandlers: TWordList;
     UnhandledReader : plua_PropertyReader;
     UnhandledWriter : plua_PropertyWriter;
     Properties  : Array of TLuaClassProperty;
     Methods     : Array of TLuaClassMethod;
+
+    // information for representing special kinds of objects behaving a lot like Lua tables
+    // they will support following operations
+    //   - read value by key
+    //   - insert key/value (first assignment of non-existing key)
+    //   - modify value by key (ordinary assignment)
+    //   - remove item by key (via nil assignment)
+    //   - iterate all key/values (via __pairs metamethod support)
+    OnRead               : plua_ClassMethodWrapper;   // receives the same arguments as __index metamethod
+    OnReadByIndex        : plua_ClassMethodWrapper;   // receives single integer argument in [0..KeyCount-1] range, returns key/value pair
+    OnInsertModifyRemove : plua_ClassMethodWrapper;   // receives the same arguments as __newindex metamethod
+    OnGetKeyCount        : plua_ClassMethodWrapper;   // will return key count to initialize iteration via "for in" loop
   end;
 
   TLuaInstanceInfo = record
@@ -422,7 +435,7 @@ begin
   obj_user:=lua_newuserdata(L, sizeof(instance));
   obj_user^:=instance;
 
-  luaL_getmetatable(l, PChar(ClassMetaTableName(cinfo)) );
+  lua_getglobal(l, PChar(ClassMetaTableName(cinfo)) );
   lua_setmetatable(l, -2);
 
   result := 1;
@@ -461,6 +474,13 @@ begin
   lua_pushcclosure(L, @plua_call_method, 1);
 end;
 
+procedure plua_pushmethod(l: PLua_State; wrapper:plua_ClassMethodWrapper);
+//pushes wrapper method on Lua stack
+begin
+  lua_pushlightuserdata(l, Pointer(wrapper));
+  lua_pushcclosure(L, @plua_call_method, 1);
+end;
+
 type
   TRegisterClassInfo = record
     ClassMetaTable : string;
@@ -476,7 +496,7 @@ begin
   Result:=False;
   //already registered?
   R.ClassMetaTable:=ClassMetaTableName(ClassName);
-  luaL_getmetatable(l, PChar(R.ClassMetaTable) );
+  lua_getglobal( l, PChar(R.ClassMetaTable) );
   if lua_istable(l, -1) then
     begin
       LogDebug('Skipping registering class %s. Metatable already registered', [ClassName]);
@@ -495,26 +515,28 @@ begin
   plua_pushstring(l, ClassName);
   lua_newtable(l);
 
-  //assign internal class id to class table
-  lua_pushstring(L, '__ClassId');
-  lua_pushlightuserdata(L, ClassId);
-  lua_rawset(L, -3);
+    //assign internal class id to class table
+    lua_pushstring(L, '__ClassId');
+    lua_pushlightuserdata(L, ClassId);
+    lua_rawset(L, -3);
+
+    //assign named metatable to class table
+    pLua_TableGlobalCreate(l, R.ClassMetaTable);
+    lua_getglobal(l, PChar(R.ClassMetaTable) );
+    lua_setmetatable(l, -2);
+
+  // create named class table
+  lua_settable(l, LUA_GLOBALSINDEX);
 
   R.ProcsMetaTable:=ClassProcsMetaTableName(ClassName);
   R.PropsMetaTable:=ClassPropsMetaTableName(ClassName);
 
-  if luaL_newmetatable(l, PChar(R.ClassMetaTable) ) <> 1 then
-    begin
-      plua_RaiseException(l, 'Cannot create metatable for class %s', [ClassName]);
-    end;
-
-  lua_setmetatable(l, -2);
-  lua_settable(l, LUA_GLOBALSINDEX);
   Result:=True;
 end;
 
 procedure plua_registerclass(l: PLua_State; classInfo: PLuaClassInfo);
 
+  {$REGION 'STDCLASS'}
   procedure CreateProps(const R:TRegisterClassInfo);
   var midx : integer;
   begin
@@ -568,7 +590,7 @@ procedure plua_registerclass(l: PLua_State; classInfo: PLuaClassInfo);
   var midx: integer;
   begin
     //populate main class metatable
-    luaL_getmetatable(l, PChar(R.ClassMetaTable) );
+    lua_getglobal(l, PChar(R.ClassMetaTable) );
     midx := lua_gettop(l);
 
     lua_pushstring(L, '__call');
@@ -587,7 +609,7 @@ procedure plua_registerclass(l: PLua_State; classInfo: PLuaClassInfo);
   var midx, err : integer;
   begin
     //populate main class metatable
-    luaL_getmetatable(l, PChar(R.ClassMetaTable) );
+    lua_getglobal(l, PChar(R.ClassMetaTable) );
     midx := lua_gettop(l);
 
     lua_pushstring(L, '__index');
@@ -664,6 +686,149 @@ procedure plua_registerclass(l: PLua_State; classInfo: PLuaClassInfo);
     CreateStdMetaMethods(R);
     CreateStdMethodPropSupport(R);
   end;
+  {$ENDREGION}
+
+  {$REGION 'TABLECLASS'}
+  procedure CreateTableMetaSupport(const R:TRegisterClassInfo);
+  var midx, err : integer;
+  begin
+    //populate main class metatable
+    lua_getglobal(l, PChar(R.ClassMetaTable) );
+    midx := lua_gettop(l);
+
+    lua_pushstring(L, 'OnRead');
+    plua_pushmethod(l, classInfo^.OnRead);
+    lua_rawset(L, midx);
+
+    lua_pushstring(L, '__index');
+    err:=plua_FunctionCompile(l,
+           'function(t,k)'                                         +sLineBreak+
+           '  local mt = getmetatable(t)'                          +sLineBreak+
+           '  if mt.OnReadWrapper == nil then'                     +sLineBreak+
+           '    return mt.OnRead(t,k)'                             +sLineBreak+
+           '  else'                                                +sLineBreak+
+           '    return mt.OnReadWrapper( mt.OnRead, t, k )'        +sLineBreak+
+           '  end'                                                 +sLineBreak+
+           'end');
+    if err <> 0 then
+        plua_RaiseException(l, 'Cannot compile __index function for class %s metatable', [classInfo^.ClassName]);
+    lua_rawset(L, midx);
+
+    lua_pushstring(L, 'OnInsertModifyRemove');
+    plua_pushmethod(l, classInfo^.OnInsertModifyRemove);
+    lua_rawset(L, midx);
+
+    lua_pushstring(L, '__newindex');
+    err:=plua_FunctionCompile(l,
+           'function(t,k,v)'                                             +sLineBreak+
+           '  local mt = getmetatable(t)'                                +sLineBreak+
+           '  if mt.OnInsertModifyRemoveWrapper == nil then'             +sLineBreak+
+           '    mt.OnInsertModifyRemove(t,k,v)'                          +sLineBreak+
+           '  else'                                                      +sLineBreak+
+           '    mt.OnInsertModifyRemoveWrapper( mt.OnInsertModifyRemove, t, k, v )' +sLineBreak+
+           '  end'                                                       +sLineBreak+
+           'end');
+    if err <> 0 then
+        plua_RaiseException(l, 'Cannot compile __newindex function for class %s metatable', [classInfo^.ClassName]);
+    lua_rawset(L, midx);
+
+    lua_pushstring(L, '__len');
+    plua_pushmethod(l, classInfo^.OnGetKeyCount);
+    lua_rawset(L, midx);
+
+    // publish OnReadByIndex for __pairs function
+    lua_pushstring(L, 'OnReadByIndex');
+    plua_pushmethod(l, classInfo^.OnReadByIndex);
+    lua_rawset(L, midx);
+
+    // publish OnGetKeyCount for __pairs function
+    lua_pushstring(L, 'OnGetKeyCount');
+    plua_pushmethod(l, classInfo^.OnGetKeyCount);
+    lua_rawset(L, midx);
+
+    lua_pushstring(L, '__pairs');
+    err:=plua_FunctionCompile(l,
+           'function(t)'                                              +sLineBreak+
+           '  local i = -1'                                           +sLineBreak+
+           '  local mt = getmetatable(t)'                             +sLineBreak+
+
+           // additional checks
+           '  if (mt == nil) or '                                     +sLineBreak+
+           '     (mt.OnGetKeyCount == nil) or'                        +sLineBreak+
+           '     (mt.OnReadByIndex == nil) then'                      +sLineBreak+
+           '    return function()'                                    +sLineBreak+
+           '      return nil, nil'                                    +sLineBreak+
+           '    end, t, nil'                                          +sLineBreak+
+           '  end'                                                    +sLineBreak+
+
+           '  local count = mt.OnGetKeyCount(t)'                      +sLineBreak+
+           '  return function()'                                      +sLineBreak+
+           '    if (count == nil) or (i >= count-1) then'             +sLineBreak+
+           '      return nil, nil'                                    +sLineBreak+
+           '    end'                                                  +sLineBreak+
+           '    i = i + 1'                                            +sLineBreak+
+
+           '    if mt.OnReadByIndexWrapper == nil then'               +sLineBreak+
+           '      return mt.OnReadByIndex(t,i)'                       +sLineBreak+
+           '    else'                                                 +sLineBreak+
+           '      return mt.OnReadByIndexWrapper( mt.OnReadByIndex, t, i )' +sLineBreak+
+           '    end'                                                        +sLineBreak+
+           '  end, t, nil'                                            +sLineBreak+
+           'end');
+    if err <> 0 then
+        plua_RaiseException(l, 'Cannot compile __pairs function for class %s metatable', [classInfo^.ClassName]);
+    lua_rawset(L, midx);
+
+    //pop class metatable
+    lua_pop(l, 1);
+  end;
+
+  procedure CreateTableClass(const R:TRegisterClassInfo);
+  begin
+    //Pseudo-code for metatable created below
+    //
+    //  class_mt = {
+    //     __gc = plua_gc_class,
+    //     __call = plua_new_class,
+    //     __index= function(t,x)
+    //         return OnRead(t, x)
+    //       end,
+    //     __newindex= function(t,p,val)
+    //         OnInsertModifyRemove(t,p,val)
+    //       end,
+    //     __len= function(t)
+    //         return OnGetKeyCount(t)
+    //       end,
+    //       OnReadByIndex = function(t,i)
+    //         return OnReadByIndex(t,i)
+    //       end,
+    //     __pairs= function(t)
+    //         local i = -1
+    //         local mt = getmetatable(t)
+    //         local count = mt.OnGetKeyCount(t)
+    //         return function()
+    //           if i >= count-1 then
+    //             return
+    //           end
+    //           i = i + 1
+    //           return i, mt.OnReadByIndex(t,i)
+    //         end
+    //       end
+    //  }
+    // setmetatable(obj, class_mt)
+
+    with classInfo^ do
+      Assert( (OnRead <> nil) and
+              (OnReadByIndex <> nil) and
+              (OnInsertModifyRemove <> nil) and
+              (OnGetKeyCount <> nil),
+              'All class as table meta info must be filled'
+            );
+
+    CreateStdMetaMethods(R);
+    CreateTableMetaSupport(R);
+  end;
+  {$ENDREGION}
 
 var StartTop: integer;
     R:TRegisterClassInfo;
@@ -684,7 +849,10 @@ begin
   S:=LuaSelf(l);
   S.LuaClasses.Add(classInfo); // now LuaClasses become the owner of classInfo
 
-  CreateStdClass(R);
+  if classInfo^.OnInsertModifyRemove = nil then
+    CreateStdClass(R)
+    else
+    CreateTableClass(R);
 
   plua_CheckStackBalance(l, StartTop);
 
@@ -708,6 +876,10 @@ begin
   ClassInfo.UnhandledWriter := nil;
   SetLength(ClassInfo.Properties, 0);
   SetLength(ClassInfo.Methods, 0);
+  ClassInfo.OnRead               := nil;
+  ClassInfo.OnReadByIndex        := nil;
+  ClassInfo.OnInsertModifyRemove := nil;
+  ClassInfo.OnGetKeyCount        := nil;
 end;
 
 procedure plua_releaseClassInfo(var ClassInfoPointer: PLuaClassInfo);
@@ -885,7 +1057,7 @@ begin
       classinfo:=Lua.LuaClasses.ClassInfoById[ classId ];
 
       //assign metatable to simulate "classness"
-      luaL_getmetatable(l, PChar(ClassMetaTableName(classInfo)) );
+      lua_getglobal(l, PChar(ClassMetaTableName(classinfo)) );
       lua_setmetatable(l, -2);
     end;
   plua_CheckStackBalance(l, StartTop + 1, LUA_TUSERDATA);
