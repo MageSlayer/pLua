@@ -236,6 +236,8 @@ type
 const
   LuaJIT_CTID_CTYPEID = 21;         // see CTTYDEF in lj_ctypes.h
   LuaJIT_CTID_INVALID = $ffffffff;
+
+  LuaJIT_CTYPEDID_INT64 = 11;       // ctype for int64
 type
   LuaJIT_CTypeID   = UInt32;
   PLuaJIT_CTypeID  = ^LuaJIT_CTypeID;
@@ -335,6 +337,7 @@ function lua_topointer(L : Plua_State; idx : Integer) : Pointer;
   extdecl; external LuaDLL;
 
 {$IFDEF LUAJIT}
+// see LuaJIT_CTYPEDID_* constants for ctypeid standard types
 function luajit_tocdata(L : Plua_State; idx : Integer; out ctypeid : LuaJIT_CTypeID) : Pointer;
 function luajit_getctypeid(L : Plua_State; typename : PChar; out ctypeid : LuaJIT_CTypeID):boolean;
 {$ENDIF}

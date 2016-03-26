@@ -356,7 +356,7 @@ begin
       varsmallint,
       varinteger,
       varsingle,
-      varint64,
+      varint64,   // TODO: LuaJIT supports 64bit integers as cdata
       vardecimal,
       vardouble  :
                    lua_pushnumber(L, Double(VarAsType(v, varDouble)));
@@ -642,6 +642,10 @@ function plua_tovariant(L: Plua_State; Index: Integer; CdataHandler:TLuaCdataHan
 Var
   dataType :Integer;
   dataNum  :Double;
+  {$IFDEF LUAJIT}
+  p        :Pointer;
+  ctypeid  :LuaJIT_CTypeID;
+  {$ENDIF}
 begin
   dataType :=lua_type(L, Index);
   case dataType of
@@ -668,10 +672,22 @@ begin
 
     {$IFDEF LUAJIT}
     LUA_TCDATA:
-      if CdataHandler = nil then
-         raise LuaException.Create('Cannot pop cdata from stack. plua_tovariant')
-         else
-         Result:=CdataHandler( lua_topointer(L, Index) );
+      begin
+        p := luajit_tocdata(l, Index, ctypeid);
+        if p = nil then
+           raise LuaException.Create('Cannot pop nil cdata from stack. plua_tovariant');
+
+        // check for 64bit number cdata
+        if ctypeid = LuaJIT_CTYPEDID_INT64 then
+          Result:=PInt64(p)^
+        else
+        begin
+          if CdataHandler = nil then
+             raise LuaException.Create('Cannot pop cdata from stack. plua_tovariant')
+             else
+             Result:=CdataHandler( p );
+        end;
+      end;
     {$ENDIF}
   else
     result := NULL;
