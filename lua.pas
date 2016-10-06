@@ -245,12 +245,44 @@ type
   LuaJIT_CTypeID1  = UInt16;
   PLuaJIT_CTypeID1 = ^LuaJIT_CTypeID1;
 
-  LuaJIT_GCHeader = array[0..5] of byte; // opaque structure
-  LuaJIT_GCcdata  = packed record        // see GCcdata in lj_obj.h
-    gcheader : LuaJIT_GCHeader;
-    ctypeid : LuaJIT_CTypeID1;          // warning 16bit field instead!!!
+  {$IFDEF FPC}
+    {$push}
+    {$packrecords C} // TODO: Delphi support
+  {$ENDIF}
+  LuaJIT_GCRef = record  // see GCRef in lj_obj.h
+    {$IFDEF LUAJIT_GC64}
+    gcptr64: UInt64;     // True 64 bit pointer.
+    {$ELSE}
+    gcptr32: UInt32;     // Pseudo 32 bit pointer.
+    {$ENDIF}
+  end;
+
+  LuaJIT_GCcdata  = record        // see GCcdata in lj_obj.h
+    // record requires C packing!!!
+
+    //   gcheader : LuaJIT_GCHeader;  // see GCHeader macro in lj_obj.h
+    nextgc:LuaJIT_GCRef;
+    marked:UInt8;
+    gct:UInt8;
+    //   gcheader : LuaJIT_GCHeader;
+
+    ctypeid : LuaJIT_CTypeID1;
   end;
   PLuaJIT_GCcdata = ^LuaJIT_GCcdata;
+
+  {$IFDEF LUAJIT_GC64}
+    {$IF sizeof(LuaJIT_GCcdata) <> 16}
+      {$Fatal LuaJIT_GCcdata size invalid}
+    {$ENDIF}
+  {$ELSE}
+    {$IF sizeof(LuaJIT_GCcdata) <> 8}
+      {$Fatal LuaJIT_GCcdata size invalid}
+    {$ENDIF}
+  {$ENDIF}
+
+  {$IFDEF FPC}
+    {$pop} // restore packrecords setting
+  {$ENDIF}
 {$ENDIF}
 
 (*
