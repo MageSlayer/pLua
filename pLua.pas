@@ -98,7 +98,8 @@ function  plua_TableToVariantArray( L: Plua_State; Index: Integer;
 procedure pLua_TableGlobalCreate(L : Plua_State; const TableName:string);
 function pLua_TableExists(L : Plua_State; const TableName:string):boolean;
 
-procedure plua_PushTable(L: PLua_State; const v:variant; VariantHandler:TLuaVariantHandler = nil);
+procedure plua_PushTable(L: PLua_State; const v:variant; VariantHandler:TLuaVariantHandler = nil);overload;
+procedure plua_PushTable(L: PLua_State; const values, keys:array of variant; VariantHandler:TLuaVariantHandler = nil);overload;
 function plua_TableToVariant( L: Plua_State; Index: Integer; CdataHandler:TLuaCdataHandler = nil ) : variant;
 function plua_tovariant(L: Plua_State; Index: Integer; CdataHandler:TLuaCdataHandler = nil): Variant;
 
@@ -319,12 +320,20 @@ var
 begin
   // lua table to be pushed contains of two elements (see plua_TableToVariant)
   h := VarArrayHighBound(v, 1);
-  assert( h = 1, 'Invalid array passed to plua_pushvariant' );
+  assert( h = 1, 'Invalid array passed to plua_PushTable' );
   // first containts a variant array of values
   values:=v[0];
   // second containts a variant array of keys
   keys:=v[1];
-  assert( Length(keys) = Length(values), 'Keys/values passed to plua_pushvariant do not match' );
+
+  plua_PushTable(l, values, keys, VariantHandler);
+end;
+
+procedure plua_PushTable(L: PLua_State; const values, keys: array of variant; VariantHandler: TLuaVariantHandler);
+var
+  i: Integer;
+begin
+  assert( Length(keys) = Length(values), 'Keys/values passed to plua_PushTable do not match' );
 
   lua_newtable(L);
   for i := 0 to High(keys) do
