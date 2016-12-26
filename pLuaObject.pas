@@ -534,6 +534,14 @@ begin
   Result:=True;
 end;
 
+function plua_ObjInstance(target : TObject; l : Plua_State; paramidxstart, paramcount : integer) : Integer;
+// return object instance pointer for using e.g. in FFI calls
+begin
+  lua_pop(l, 1); // remove self pointer from stack
+  lua_pushlightuserdata(L, Pointer(target));
+  Result:=1;
+end;
+
 procedure plua_registerclass(l: PLua_State; classInfo: PLuaClassInfo);
 
   {$REGION 'STDCLASS'}
@@ -559,6 +567,8 @@ procedure plua_registerclass(l: PLua_State; classInfo: PLuaClassInfo);
   end;
 
   procedure CreateMethods(const R:TRegisterClassInfo);
+  const
+    ObjInstanceMethod = 'ObjInstance';
   var midx, i: integer;
   begin
     //create methods metatable
@@ -570,19 +580,26 @@ procedure plua_registerclass(l: PLua_State; classInfo: PLuaClassInfo);
     midx := lua_gettop(l);
 
     //populate class methods metatable
+    LogDebug('Registering class methods.');
+
+    //register special function ObjInstance to return real FPC object instance pointer
+    //it can be passed via FFI to speed up any method calls
+    plua_pushmethod(L, ObjInstanceMethod, @plua_ObjInstance);
+    lua_rawset(l, midx);
+
     if Length(classInfo^.Methods) > 0 then
-        begin
-          LogDebug('Registering class methods.');
-          // TODO - Add parent method calls in
-          for i := 0 to High(classInfo^.Methods) do
-            begin
-              LogDebug('Registering class method %s.', [classInfo^.Methods[i].MethodName]);
-              with classInfo^.Methods[i] do
-                plua_pushmethod(L, MethodName, wrapper);
-              lua_rawset(l, midx);
-            end;
-          LogDebug('Registering class methods - done.');
-        end;
+      begin
+        // TODO - Add parent method calls in
+        for i := 0 to High(classInfo^.Methods) do
+          begin
+            LogDebug('Registering class method %s.', [classInfo^.Methods[i].MethodName]);
+            with classInfo^.Methods[i] do
+              plua_pushmethod(L, MethodName, wrapper);
+            lua_rawset(l, midx);
+          end;
+      end;
+
+    LogDebug('Registering class methods - done.');
     lua_pop(l, 1);
   end;
 
