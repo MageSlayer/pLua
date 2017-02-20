@@ -1164,7 +1164,6 @@ end;
 
 function luajit_getctypeid(L : Plua_State; typename : PChar; out ctypeid : LuaJIT_CTypeID):boolean;
 var idx : Integer;
-    cd : PLuaJIT_GCcdata;
     p : Pointer;
     typeof_success : boolean;
 begin
@@ -1193,15 +1192,8 @@ begin
       Exit;
 
     // Returned type should be LUA_TCDATA with CTID_CTYPEID
-    if lua_type(L, -1) <> LUA_TCDATA then
-      Exit;
-
-    p := lua_topointer(l, -1);
-    if p = nil then
-      Exit;
-
-    cd := PLuaJIT_GCcdata( PByte(p) - sizeof(LuaJIT_GCcdata) );
-    if cd^.ctypeid <> LuaJIT_CTID_CTYPEID then
+    p:=luajit_tocdata(L, -1, ctypeid);
+    if (p = nil) or (ctypeid <> LuaJIT_CTID_CTYPEID) then
       Exit;
 
     ctypeid := PLuaJIT_CTypeID(p)^;
