@@ -1148,7 +1148,7 @@ begin
   Result := nil;
   ctypeid:= LuaJIT_CTID_INVALID;
 
-  T:=lua_type(l, -1);
+  T:=lua_type(l, idx);
   if T <> LUA_TCDATA then
     Exit;
 
