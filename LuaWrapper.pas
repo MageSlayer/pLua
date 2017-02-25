@@ -861,19 +861,22 @@ begin
 end;
 
 function LuaSelf(L: PLua_State): TLuaInternalState;
+{$OBJECTCHECKS OFF}  // Harmless while no additional fields/virtual functions vs. TLua class added
 var StartTop:Integer;
+    p:TObject;
 begin
   StartTop:=lua_gettop(l);
-  Result:=TLuaInternalState(plua_GlobalObjectGet(l, Lua_Self));
+  p:=plua_GlobalObjectGet(l, Lua_Self);
 
   //global VM object MUST BE registered, otherwise something really wrong.
-  if Result = nil then
+  if p = nil then
     plua_RaiseException(l, StartTop, 'Global Lua VM Self pointer is not registered');
 
-  if Result.ClassType <> TLUA then
-    plua_RaiseException(l, StartTop, 'Global Lua VM Self must be of type %s, but has type %s', [TLUA.ClassName, Result.ClassName]);
+  if p.ClassType <> TLUA then
+    plua_RaiseException(l, StartTop, 'Global Lua VM Self must be of type %s, but has type %s', [TLUA.ClassName, p.ClassName]);
 
   plua_CheckStackBalance(l, StartTop);
+  Result:=TLuaInternalState(p);
 end;
 
 procedure LuaObjects_Add(S:TLuaInternalState; instance:PLuaInstanceInfo);
@@ -885,9 +888,7 @@ begin
 end;
 
 procedure LuaRecs_Free(S: TLuaInternalState; instance: PLuaRecordInstanceInfo);
-var i:integer;
-    C:PLuaClassInfo;
-    RecInfo:PLuaRecordInfo;
+var RecInfo:PLuaRecordInfo;
 begin
   if instance^.OwnsInstance then
     begin
