@@ -311,9 +311,8 @@ end;
 
 function plua_file_slurp(l : PLua_State; paramcount: Integer) : integer;
 var Filename, S:string;
-    f:file;
-    FLen, FSize, BytesRead:int64;
-    Buf:array[0..65535] of byte;
+    Size:int64;
+    F:TFileStream;
 begin
   Result:=0;
 
@@ -326,35 +325,17 @@ begin
   if not FileExists(Filename) then
     pLua_RaiseException(l, 'File %s does not exist.', [FileName]);
 
-
-  AssignFile(f, Filename);
+  // allow reading files in several threads...
+  F:=TFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
   try
-    Reset(f,1);
-
-    FLen:=FileSize(f);
-    SetLength(S, FLen);
-
-    FSize:=0;
-    repeat
-      BlockRead(f, Buf, SizeOf(Buf), BytesRead);
-      Inc(FSize, BytesRead);
-
-      if BytesRead <= 0 then break;
-
-      if FSize > Length(S) then
-        begin
-          SetLength(S, Length(S) + BytesRead*4);
-        end;
-
-      Move(Buf, (@S[FSize - BytesRead + 1])^, BytesRead);
-    until false;
-
-    SetLength(S, FSize);
+    Size:=F.Size;
+    SetLength(S, Size);
+    F.ReadBuffer((@S[1])^, Size);
   finally
-    CloseFile(f);
+    FreeAndNil(F);
   end;
 
-  lua_pushlstring(l, PChar(S), FSize);
+  lua_pushlstring(l, PChar(S), Size);
 
   Result:=1;
 end;

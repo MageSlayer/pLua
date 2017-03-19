@@ -546,9 +546,10 @@ end;
 
 procedure TLUA.ExecuteFile(FileName: AnsiString);
 var
-  Script : AnsiString;
-  sl     : TStringList;
   StartTop: Integer;
+  F:TFileStream;
+  S:string;
+  Size:int64;
 begin
   if L = nil then
     Open;
@@ -556,8 +557,20 @@ begin
   StartTop:=lua_gettop(l);
   try
     PushErrorHandler;
+    {
+    // does not work with multiple processes/threads reading source file simultaneously...
     ErrorTest(luaL_loadfile(L, PChar(FileName)));
-    ExecuteScript(0,0);
+    }
+    F:=TFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
+    try
+      Size:=F.Size;
+      SetLength(S, Size);
+      F.ReadBuffer((@S[1])^, Size);
+      ErrorTest(luaL_loadbuffer(L, @S[1], Size, PChar(FileName)));
+      ExecuteScript(0,0);
+    finally
+      FreeAndNil(F);
+    end;
   finally
     plua_EnsureStackBalance(l, StartTop);
   end;
