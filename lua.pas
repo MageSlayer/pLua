@@ -457,6 +457,10 @@ function  lua_load(L : Plua_State; reader : lua_Reader;
 function lua_dump(L : Plua_State; writer : lua_Writer; data: Pointer) : Integer;
   extdecl; external LuaDLL;
 
+{$IFDEF LUAJIT_DUMPX}
+function lua_dumpx(L : Plua_State; idx : Integer; writer : lua_Writer; data: Pointer; strip: Integer) : Integer;
+  extdecl; external LuaDLL;
+{$ENDIF}
 
 (*
 ** coroutine functions

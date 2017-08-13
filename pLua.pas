@@ -10,7 +10,7 @@ unit pLua;
 interface
 
 uses
-  SysUtils, Classes, lua;
+  SysUtils, Classes, lua, variants;
 
 type
   TVariantArray =array of Variant;
@@ -89,6 +89,10 @@ procedure plua_popstrings( L : PLua_State; S : TStrings; Keys:TStrings = nil );
 function  plua_popvariants( L : PLua_State; count:integer; ReverseOrder:boolean; CdataHandler:TLuaCdataHandler = nil ):TVariantArray;
 
 //dumps function on top of stack to string (string.dump analog)
+{$IFDEF LUAJIT_DUMPX}
+const varLuaFunction = CFirstUserType+1; // type id for variant
+function plua_toFuncDump( L : PLua_State; Index:Integer; strip: Boolean ):string;
+{$ENDIF}
 function plua_popFuncDump( L : PLua_State ):string;
 
 //deprecated. Do not use. Use plua_TableToVariant instead
@@ -176,7 +180,7 @@ procedure lua_logstack(const LogPrefix: string; L: PLua_State);
 implementation
 
 uses
-  Variants;
+  math;
 
 {$IFDEF LUAJIT_EXCEPTION_SUPPORT}
 procedure lua_reporterror(l : PLua_State; const ErrMes:string);
@@ -232,6 +236,51 @@ begin
   Result:=StrAlloc(Length(S)+1);
   StrPCopy(Result, S);
 end;
+
+{$IFDEF LUAJIT_DUMPX}
+type
+
+{ TLuaFunctionDump }
+
+// type for dealing with lua function dumps in variants
+TLuaFunctionDump = class(TCustomVariantType)
+  public
+    constructor Create;
+    procedure Clear(var V: TVarData); override;
+    procedure Copy(var Dest: TVarData; const Source: TVarData; const Indirect: Boolean); override;
+    procedure Cast(var Dest: TVarData; const Source: TVarData); override;
+end;
+
+{ TLuaFunctionDump }
+
+constructor TLuaFunctionDump.Create;
+begin
+  inherited Create(varLuaFunction);
+end;
+
+procedure TLuaFunctionDump.Clear(var V: TVarData);
+begin
+  if V.vType <> varLuaFunction then
+    raise Exception.CreateFmt('Only varLuaFunction type is supported. %d (TLuaFunctionDump.Clear)', [V.vType]);
+  String(V.vstring):='';
+end;
+
+procedure TLuaFunctionDump.Copy(var Dest: TVarData; const Source: TVarData; const Indirect: Boolean);
+var s:string;
+begin
+  s:=String(Source.vstring);
+  Dest.vString := nil;
+  String(Dest.vstring):=s;
+  Dest.vtype:=varLuaFunction;
+end;
+
+procedure TLuaFunctionDump.Cast(var Dest: TVarData; const Source: TVarData);
+begin
+  if Source.vType <> varstring then
+    raise Exception.CreateFmt('Cast from %s to varLuaFunction is not supported', [Source.vType]);
+  Copy(Dest, Source, true);
+end;
+{$ENDIF}
 
 procedure plua_RegisterLuaTable(l: PLua_State; Name: AnsiString;
   Reader: lua_CFunction; Writer: lua_CFunction; TableIndex: Integer);
@@ -345,7 +394,10 @@ begin
 end;
 
 procedure plua_pushvariant(L: PLua_State; const v: Variant; VariantHandler:TLuaVariantHandler);
-var c, h:Integer;
+var c, h, err:Integer;
+  {$IFDEF LUAJIT_DUMPX}
+  s:string;
+  {$ENDIF}
 begin
   if (VariantHandler = nil) or    //if variant handler is not defined
      (not VariantHandler(l, v))   //or it could not push the value on stack
@@ -385,6 +437,16 @@ begin
                    begin
                      plua_pushtable(l, v, VariantHandler);
                    end;
+      {$IFDEF LUAJIT_DUMPX}
+      // custom/patched LuaJIT needed
+      varLuaFunction:
+                   begin
+                     s:=String(tvardata(v).vstring);
+                     err:=luaL_loadbuffer(l, PChar(s), Length(s), 'luaFunction');
+                     if err <> 0 then
+                       raise LuaException.CreateFmt('Error loading lua function %d (plua_pushvariant)', [err]);
+                   end;
+      {$ENDIF}
       else
         raise LuaException.CreateFmt('Unsupported type (%d) passed to plua_pushvariant', [VarType(v)]);
     end;
@@ -475,6 +537,44 @@ begin
         Result[i]:=plua_popvariant(L, CdataHandler);
       end;
 end;
+
+type
+  TStrWrite = record
+     s:String;
+     real_len:NativeInt;
+  end;
+  PStrWrite = ^TStrWrite;
+function StrWriter(L : Plua_State; p : Pointer; sz : size_t; ud : Pointer) : Integer; extdecl;
+var s:PStrWrite;
+begin
+  s:=PStrWrite(ud);
+  if s^.real_len + sz > Length(s^.s) then
+    SetLength(s^.s, max(2*Length(s^.s), s^.real_len + sz));
+  Move(p^, (@s^.s[s^.real_len+1])^, sz);
+  Inc(s^.real_len, sz);
+  Result:=0;
+end;
+
+{$IFDEF LUAJIT_DUMPX}
+function plua_toFuncDump( L : PLua_State; Index:Integer; strip:boolean ):string;
+//dumps function internal representation to string
+//string.dump analog
+var err:Integer;
+    s:TStrWrite;
+begin
+  if lua_type(l, Index) <> LUA_TFUNCTION then
+    raise LuaException.Create('plua_FuncDump requires function to dump');
+
+  s.s:='';
+  s.real_len:=0;
+  err:=lua_dumpx(L, Index, @StrWriter, @s, Integer(strip));
+  if err <> 0 then
+    raise LuaException.CreateFmt('dumpx failed. Error %s', [err]);
+
+  SetLength(s.s, s.real_len);
+  Result:=s.s;
+end;
+{$ENDIF}
 
 function plua_popFuncDump(L: PLua_State): string;
 //dumps function internal representation to string
@@ -655,6 +755,9 @@ Var
   p        :Pointer;
   ctypeid  :LuaJIT_CTypeID;
   {$ENDIF}
+  {$IFDEF LUAJIT_DUMPX}
+  s:String;
+  {$ENDIF}
 begin
   dataType :=lua_type(L, Index);
   case dataType of
@@ -678,6 +781,13 @@ begin
                            end;
     //LUA_TTABLE           : result := plua_TableToVariantArray(L, Index);
     LUA_TTABLE           : result := plua_TableToVariant(L, Index, CdataHandler);
+    {$IFDEF LUAJIT_DUMPX}
+    // custom/patched LuaJIT allows to dump any value on stack vs. only the top one in standard Lua
+    LUA_TFUNCTION        : begin
+                             s:=plua_toFuncDump(L, Index, true);
+                             result := VarAsType(s, varLuaFunction);
+                           end;
+    {$ENDIF}
 
     {$IFDEF LUAJIT}
     LUA_TCDATA:
@@ -1085,6 +1195,14 @@ begin
     plua_EnsureStackBalance(L, StartTop);
   end;
 end;
+
+{$IFDEF LUAJIT_DUMPX}
+var D:TLuaFunctionDump;
+initialization
+  D:=TLuaFunctionDump.Create;
+finalization
+  FreeAndNil(D);
+{$ENDIF}
 
 end.
 
