@@ -271,6 +271,7 @@ begin
   Finalize(PLuaFuncDump(V.vpointer));
   FreeMem(PLuaFuncDump(V.vpointer));
   V.vpointer:=nil;
+  V.vtype:=varempty;
 end;
 
 procedure TLuaFunctionDump.Copy(var Dest: TVarData; const Source: TVarData; const Indirect: Boolean);
